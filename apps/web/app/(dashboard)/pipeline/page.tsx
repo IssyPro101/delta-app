@@ -1,8 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
 import type { PipelineResponse } from "@pipeline-intelligence/shared";
 
 import { QuerySelect } from "../../../components/query-select";
 import { PipelineView } from "../../../components/pipeline-view";
-import { apiFetch } from "../../../lib/api";
+import { Panel } from "../../../components/ui";
+import { apiFetch, toErrorMessage } from "../../../lib/api";
 
 const periodOptions = [
   { value: "last_30_days", label: "Last 30 days" },
@@ -11,20 +17,60 @@ const periodOptions = [
   { value: "all_time", label: "All time" },
 ];
 
-export default async function PipelinePage({
-  searchParams,
-}: Readonly<{
-  searchParams: Promise<{ pipeline_name?: string; period?: string }>;
-}>) {
-  const params = await searchParams;
-  const period = params.period ?? "last_90_days";
+export default function PipelinePage() {
+  const searchParams = useSearchParams();
+  const pipelineName = searchParams.get("pipeline_name") ?? undefined;
+  const period = searchParams.get("period") ?? "last_90_days";
+  const [data, setData] = useState<PipelineResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const query = new URLSearchParams();
 
-  if (params.pipeline_name) query.set("pipeline_name", params.pipeline_name);
+  if (pipelineName) query.set("pipeline_name", pipelineName);
   if (period) query.set("period", period);
+  const queryString = query.toString();
 
-  const data = await apiFetch<PipelineResponse>(`/api/pipeline?${query.toString()}`);
-  const selectedPipeline = params.pipeline_name ?? "all";
+  useEffect(() => {
+    let active = true;
+
+    setData(null);
+    setError(null);
+
+    void (async () => {
+      try {
+        const nextData = await apiFetch<PipelineResponse>(`/api/pipeline?${queryString}`);
+
+        if (active) {
+          setData(nextData);
+        }
+      } catch (error) {
+        if (active) {
+          setError(toErrorMessage(error));
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [queryString]);
+
+  if (!data && !error) {
+    return (
+      <Panel className="bg-white/75">
+        <p className="text-sm text-[color:var(--muted)]">Loading pipeline data...</p>
+      </Panel>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Panel className="border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)]">
+        <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load pipeline data."}</p>
+      </Panel>
+    );
+  }
+
+  const selectedPipeline = pipelineName ?? "all";
   const pipelineOptions = [{ value: "all", label: "All pipelines" }].concat(
     data.pipelines.map((pipeline) => ({ value: pipeline, label: pipeline })),
   );

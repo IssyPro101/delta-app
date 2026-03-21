@@ -1,8 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 import type { Integration, IntegrationProvider } from "@pipeline-intelligence/shared";
 
 import { IntegrationActions } from "../../../components/integration-actions";
 import { Panel, SectionTitle } from "../../../components/ui";
-import { apiFetch } from "../../../lib/api";
+import { apiFetch, toErrorMessage } from "../../../lib/api";
 
 const providerContent: Record<
   IntegrationProvider,
@@ -28,8 +32,52 @@ function statusText(integration?: Integration) {
   return "⚪ Not connected";
 }
 
-export default async function SettingsPage() {
-  const integrations = await apiFetch<Integration[]>("/api/integrations");
+export default function SettingsPage() {
+  const [integrations, setIntegrations] = useState<Integration[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    setIntegrations(null);
+    setError(null);
+
+    void (async () => {
+      try {
+        const nextIntegrations = await apiFetch<Integration[]>("/api/integrations");
+
+        if (active) {
+          setIntegrations(nextIntegrations);
+        }
+      } catch (error) {
+        if (active) {
+          setError(toErrorMessage(error));
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  if (!integrations && !error) {
+    return (
+      <Panel className="bg-white/75">
+        <p className="text-sm text-[color:var(--muted)]">Loading integrations...</p>
+      </Panel>
+    );
+  }
+
+  if (!integrations) {
+    return (
+      <Panel className="border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)]">
+        <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load integrations."}</p>
+      </Panel>
+    );
+  }
+
   const lookup = new Map<IntegrationProvider, Integration>(integrations.map((integration) => [integration.provider, integration]));
 
   return (
@@ -61,7 +109,7 @@ export default async function SettingsPage() {
                   </div>
                   <p className="max-w-2xl text-sm leading-7 text-[color:var(--muted)]">{providerContent[provider].syncs}</p>
                 </div>
-                <IntegrationActions provider={provider} integration={integration} />
+                <IntegrationActions provider={provider} integration={integration} onChange={() => setRefreshKey((value) => value + 1)} />
               </div>
             </Panel>
           );

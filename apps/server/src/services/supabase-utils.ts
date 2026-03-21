@@ -58,7 +58,10 @@ function toRecordObject(value: Json): Record<string, unknown> {
 
 export function toUserRecord(row: UserRow): UserRecord {
   return {
-    ...row,
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    avatar_url: row.avatar_url,
     created_at: new Date(row.created_at),
   };
 }

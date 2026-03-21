@@ -1,18 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import type { IntegrationProvider } from "@pipeline-intelligence/shared";
 
+import { useAuth } from "./auth-provider";
+import { apiFetch } from "../lib/api";
 import { Panel } from "./ui";
 
 export function OAuthCallbackClient({ provider }: Readonly<{ provider: IntegrationProvider }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { session, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
+    if (loading || startedRef.current) {
+      return;
+    }
+
+    if (!session) {
+      setError("Sign in required.");
+      return;
+    }
+
     const code = searchParams.get("code");
     const providerError = searchParams.get("error");
 
@@ -26,24 +39,22 @@ export function OAuthCallbackClient({ provider }: Readonly<{ provider: Integrati
       return;
     }
 
+    startedRef.current = true;
+
     void (async () => {
-      const response = await fetch(`/api/integrations/${provider}/connect`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ auth_code: code }),
-      });
+      try {
+        await apiFetch(`/api/integrations/${provider}/connect`, {
+          method: "POST",
+          body: JSON.stringify({ auth_code: code }),
+        });
 
-      if (!response.ok) {
+        router.replace("/settings");
+        router.refresh();
+      } catch {
         setError("Could not complete the connection.");
-        return;
       }
-
-      router.replace("/settings");
-      router.refresh();
     })();
-  }, [provider, router, searchParams]);
+  }, [loading, provider, router, searchParams, session]);
 
   return (
     <main className="grid min-h-screen place-items-center p-6">

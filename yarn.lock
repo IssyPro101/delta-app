@@ -569,6 +569,13 @@
     tslib "2.8.1"
     ws "^8.18.2"
 
+"@supabase/ssr@^0.9.0":
+  version "0.9.0"
+  resolved "https://registry.yarnpkg.com/@supabase/ssr/-/ssr-0.9.0.tgz#259d4c7e27659333b97fa8320792f9878bee812d"
+  integrity sha512-UFY6otYV3yqCgV+AyHj80vNkTvbf1Gas2LW4dpbQ4ap6p6v3eB2oaDfcI99jsuJzwVBCFU4BJI+oDYyhNk1z0Q==
+  dependencies:
+    cookie "^1.0.2"
+
 "@supabase/storage-js@2.99.3":
   version "2.99.3"
   resolved "https://registry.yarnpkg.com/@supabase/storage-js/-/storage-js-2.99.3.tgz#894a1698b74867bb27d3fa1b6d75927af039251a"
@@ -910,7 +917,7 @@ content-type@^1.0.5:
   resolved "https://registry.yarnpkg.com/content-type/-/content-type-1.0.5.tgz#8b773162656d1d1086784c8f23a54ce6d73d7918"
   integrity sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==
 
-cookie@^1.0.0, cookie@^1.0.1:
+cookie@^1.0.0, cookie@^1.0.1, cookie@^1.0.2:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/cookie/-/cookie-1.1.1.tgz#3bb9bdfc82369db9c2f69c93c9c3ceb310c88b3c"
   integrity sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==

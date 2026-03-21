@@ -1,8 +1,13 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
 import type { Deal, DealsResponse, InsightsResponse } from "@pipeline-intelligence/shared";
 
 import { InsightCard } from "../../../components/insight-card";
-import { EmptyState, PillLink, SectionTitle } from "../../../components/ui";
-import { apiFetch } from "../../../lib/api";
+import { EmptyState, Panel, PillLink, SectionTitle } from "../../../components/ui";
+import { apiFetch, toErrorMessage } from "../../../lib/api";
 
 const categories = [
   { label: "All", value: "" },
@@ -11,27 +16,71 @@ const categories = [
   { label: "Risks", value: "risk" },
 ];
 
-export default async function InsightsPage({
-  searchParams,
-}: Readonly<{
-  searchParams: Promise<{ category?: string; analyzer?: string; stage?: string; offset?: string }>;
-}>) {
-  const params = await searchParams;
+export default function InsightsPage() {
+  const searchParams = useSearchParams();
+  const category = searchParams.get("category") ?? undefined;
+  const analyzer = searchParams.get("analyzer") ?? undefined;
+  const stage = searchParams.get("stage") ?? undefined;
   const limit = 50;
-  const offset = Number(params.offset ?? "0");
+  const offset = Number(searchParams.get("offset") ?? "0");
+  const [insightData, setInsightData] = useState<InsightsResponse | null>(null);
+  const [dealData, setDealData] = useState<DealsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const query = new URLSearchParams();
 
-  if (params.category) query.set("category", params.category);
-  if (params.analyzer) query.set("analyzer", params.analyzer);
-  if (params.stage) query.set("stage", params.stage);
+  if (category) query.set("category", category);
+  if (analyzer) query.set("analyzer", analyzer);
+  if (stage) query.set("stage", stage);
   query.set("is_active", "true");
   query.set("limit", String(limit));
   query.set("offset", String(offset));
+  const queryString = query.toString();
 
-  const [insightData, dealData] = await Promise.all([
-    apiFetch<InsightsResponse>(`/api/insights?${query.toString()}`),
-    apiFetch<DealsResponse>("/api/deals?limit=200"),
-  ]);
+  useEffect(() => {
+    let active = true;
+
+    setInsightData(null);
+    setDealData(null);
+    setError(null);
+
+    void (async () => {
+      try {
+        const [nextInsightData, nextDealData] = await Promise.all([
+          apiFetch<InsightsResponse>(`/api/insights?${queryString}`),
+          apiFetch<DealsResponse>("/api/deals?limit=200"),
+        ]);
+
+        if (active) {
+          setInsightData(nextInsightData);
+          setDealData(nextDealData);
+        }
+      } catch (error) {
+        if (active) {
+          setError(toErrorMessage(error));
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [queryString]);
+
+  if ((!insightData || !dealData) && !error) {
+    return (
+      <Panel className="bg-white/75">
+        <p className="text-sm text-[color:var(--muted)]">Loading insights...</p>
+      </Panel>
+    );
+  }
+
+  if (!insightData || !dealData) {
+    return (
+      <Panel className="border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)]">
+        <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load insights."}</p>
+      </Panel>
+    );
+  }
 
   const dealLookup = new Map<string, Deal>(dealData.deals.map((deal) => [deal.id, deal]));
   const hasMore = offset + insightData.insights.length < insightData.total;
@@ -40,17 +89,17 @@ export default async function InsightsPage({
     const nextQuery = new URLSearchParams();
 
     if (category) nextQuery.set("category", category);
-    if (params.analyzer) nextQuery.set("analyzer", params.analyzer);
-    if (params.stage) nextQuery.set("stage", params.stage);
+    if (analyzer) nextQuery.set("analyzer", analyzer);
+    if (stage) nextQuery.set("stage", stage);
 
     const next = nextQuery.toString();
     return next ? `/insights?${next}` : "/insights";
   }
 
   const loadMoreQuery = new URLSearchParams();
-  if (params.category) loadMoreQuery.set("category", params.category);
-  if (params.analyzer) loadMoreQuery.set("analyzer", params.analyzer);
-  if (params.stage) loadMoreQuery.set("stage", params.stage);
+  if (category) loadMoreQuery.set("category", category);
+  if (analyzer) loadMoreQuery.set("analyzer", analyzer);
+  if (stage) loadMoreQuery.set("stage", stage);
   loadMoreQuery.set("offset", String(offset + limit));
   const loadMoreHref = `/insights?${loadMoreQuery.toString()}`;
 
@@ -58,7 +107,7 @@ export default async function InsightsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap gap-3">
         {categories.map((category) => {
-          return <PillLink key={category.label} href={categoryHref(category.value)} label={category.label} active={params.category === category.value || (!params.category && !category.value)} />;
+          return <PillLink key={category.label} href={categoryHref(category.value)} label={category.label} active={searchParams.get("category") === category.value || (!searchParams.get("category") && !category.value)} />;
         })}
       </div>
       <SectionTitle eyebrow="Analyzers" title="Findings derived from deal flow and activity" />

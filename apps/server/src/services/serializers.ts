@@ -19,7 +19,10 @@ import type {
 
 export function serializeUser(user: UserRecord): AppUser {
   return {
-    ...user,
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    avatar_url: user.avatar_url,
     created_at: user.created_at.toISOString(),
   };
 }

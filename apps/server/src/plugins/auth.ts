@@ -1,33 +1,109 @@
-import cookie from "@fastify/cookie";
-import jwt from "@fastify/jwt";
 import fp from "fastify-plugin";
 
-import { env } from "../utils/env";
+import { serializeUser } from "../services/serializers";
+import { assertData, assertMaybeData, supabase, toUserRecord } from "../services/supabase-utils";
+
+function readBearerToken(authorization?: string) {
+  if (!authorization) {
+    return null;
+  }
+
+  const [scheme, token] = authorization.split(" ");
+
+  if (scheme !== "Bearer" || !token) {
+    return null;
+  }
+
+  return token;
+}
+
+function toDisplayName(user: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}) {
+  const fullName = user.user_metadata?.full_name;
+  const name = user.user_metadata?.name;
+
+  if (typeof fullName === "string" && fullName.trim().length > 0) {
+    return fullName;
+  }
+
+  if (typeof name === "string" && name.trim().length > 0) {
+    return name;
+  }
+
+  return user.email ?? "Unknown user";
+}
+
+function toAvatarUrl(user: { user_metadata?: Record<string, unknown> }) {
+  const avatarUrl = user.user_metadata?.avatar_url;
+  const picture = user.user_metadata?.picture;
+
+  if (typeof avatarUrl === "string" && avatarUrl.length > 0) {
+    return avatarUrl;
+  }
+
+  if (typeof picture === "string" && picture.length > 0) {
+    return picture;
+  }
+
+  return null;
+}
+
+async function resolveAppUser(accessToken: string) {
+  const { data, error } = await supabase.auth.getUser(accessToken);
+
+  if (error || !data.user || !data.user.email) {
+    throw error ?? new Error("Authenticated user is missing an email");
+  }
+
+  const existingUser = assertMaybeData(
+    await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_user_id", data.user.id)
+      .maybeSingle(),
+  );
+
+  const payload = {
+    auth_user_id: data.user.id,
+    email: data.user.email,
+    name: toDisplayName(data.user),
+    avatar_url: toAvatarUrl(data.user),
+  };
+
+  const user =
+    existingUser === null
+      ? assertData(
+          await supabase
+            .from("users")
+            .upsert(payload, { onConflict: "email" })
+            .select("*")
+            .single(),
+        )
+      : assertData(
+          await supabase
+            .from("users")
+            .update(payload)
+            .eq("id", existingUser.id)
+            .select("*")
+            .single(),
+        );
+
+  return serializeUser(toUserRecord(user));
+}
 
 export const authPlugin = fp(async (app) => {
-  await app.register(cookie);
-  await app.register(jwt, {
-    secret: env.sessionSecret,
-    cookie: {
-      cookieName: env.sessionCookieName,
-      signed: false,
-    },
-  });
-
   app.decorateRequest("authUser", null);
   app.decorate("authenticate", async (request) => {
-    try {
-      const decoded = await request.jwtVerify<{
-        user: {
-          id: string;
-          email: string;
-          name: string;
-          avatar_url: string | null;
-          created_at: string;
-        };
-      }>();
+    const accessToken = readBearerToken(request.headers.authorization);
 
-      request.authUser = decoded.user;
+    if (!accessToken) {
+      throw app.httpErrors.unauthorized("Missing bearer token");
+    }
+
+    try {
+      request.authUser = await resolveAppUser(accessToken);
     } catch (error) {
       throw app.httpErrors.unauthorized("Authentication required", { cause: error });
     }

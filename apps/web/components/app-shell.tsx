@@ -4,6 +4,8 @@ import { sidebarNavigation } from "@pipeline-intelligence/shared";
 
 import type { AuthSession } from "@pipeline-intelligence/shared";
 
+import { SecondaryButton } from "./ui";
+
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -16,11 +18,15 @@ export function AppShell({
   title,
   pathname,
   session,
+  onSignOut,
+  signingOut = false,
   children,
 }: Readonly<{
   title: string;
   pathname: string;
   session: AuthSession;
+  onSignOut: () => Promise<void>;
+  signingOut?: boolean;
   children: React.ReactNode;
 }>) {
   return (
@@ -70,7 +76,7 @@ export function AppShell({
                 {title}
               </h1>
             </div>
-            <div className="flex items-center gap-3 self-start rounded-full border border-[color:var(--line)] bg-white/75 px-3 py-2 md:self-auto">
+            <div className="flex flex-wrap items-center gap-3 self-start rounded-full border border-[color:var(--line)] bg-white/75 px-3 py-2 md:self-auto">
               <div className="grid h-11 w-11 place-items-center rounded-full bg-[color:var(--accent)] text-sm font-semibold text-white">
                 {getInitials(session.user.name)}
               </div>
@@ -78,6 +84,9 @@ export function AppShell({
                 <p className="text-sm font-medium">{session.user.name}</p>
                 <p className="text-xs text-[color:var(--muted)]">{session.user.email}</p>
               </div>
+              <SecondaryButton onClick={() => void onSignOut()} disabled={signingOut} className="whitespace-nowrap">
+                {signingOut ? "Signing out..." : "Sign out"}
+              </SecondaryButton>
             </div>
           </header>
           {children}

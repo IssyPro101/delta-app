@@ -12,6 +12,7 @@ export interface Database {
       users: {
         Row: {
           id: string;
+          auth_user_id: string | null;
           email: string;
           name: string;
           avatar_url: string | null;
@@ -19,6 +20,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          auth_user_id?: string | null;
           email: string;
           name: string;
           avatar_url?: string | null;
