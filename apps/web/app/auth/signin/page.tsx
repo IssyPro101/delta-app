@@ -45,7 +45,7 @@ function SignInPageContent() {
 
         <div className="space-y-4">
           <h1 className="font-[var(--font-display)] text-4xl tracking-[-0.01em] text-[color:var(--text-strong)] md:text-[44px] md:leading-[1.15]">
-            See where deals leak before the quarter does.
+            Spot pipeline leaks and close more deals.
           </h1>
           <p className="mx-auto max-w-sm text-sm leading-relaxed text-[color:var(--muted)]">
             Sign in with Google to connect HubSpot and Fathom, backfill historical activity, and generate pipeline findings.
