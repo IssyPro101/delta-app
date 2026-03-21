@@ -7,6 +7,7 @@ const hubspotScopes = [
   "oauth",
   "crm.objects.deals.read",
   "crm.objects.contacts.read",
+  "crm.objects.contacts.write"
 ];
 
 export interface HubSpotTokenResponse {
@@ -14,6 +15,38 @@ export interface HubSpotTokenResponse {
   refresh_token?: string;
   expires_in: number;
   token_type: string;
+}
+
+export interface HubSpotAuth {
+  getAccessToken(): string;
+  refreshAccessToken(): Promise<string>;
+}
+
+export function createHubSpotAuth(
+  initialAccessToken: string,
+  initialRefreshToken: string | null,
+  onTokenRefreshed?: (tokens: HubSpotTokenResponse) => Promise<void>,
+): HubSpotAuth {
+  let accessToken = initialAccessToken;
+  let refreshToken = initialRefreshToken;
+
+  return {
+    getAccessToken() {
+      return accessToken;
+    },
+    async refreshAccessToken() {
+      if (!refreshToken) {
+        throw new Error("No HubSpot refresh token available — re-authenticate to reconnect");
+      }
+      const tokenResponse = await refreshHubSpotAccessToken(refreshToken);
+      accessToken = tokenResponse.access_token;
+      if (tokenResponse.refresh_token) {
+        refreshToken = tokenResponse.refresh_token;
+      }
+      await onTokenRefreshed?.(tokenResponse);
+      return accessToken;
+    },
+  };
 }
 
 export interface HubSpotDealResponse {
@@ -117,26 +150,35 @@ export async function refreshHubSpotAccessToken(refreshToken: string): Promise<H
 
 async function hubspotRequest<T>(
   path: string,
-  accessToken: string,
+  auth: HubSpotAuth,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${hubspotApiBase}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  const doFetch = (token: string) =>
+    fetch(`${hubspotApiBase}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+
+  let response = await doFetch(auth.getAccessToken());
+
+  if (response.status === 401) {
+    const newToken = await auth.refreshAccessToken();
+    response = await doFetch(newToken);
+  }
 
   if (!response.ok) {
+    console.error(await response.text());
     throw new Error(`HubSpot request failed: ${response.status}`);
   }
 
   return (await response.json()) as T;
 }
 
-export async function fetchHubSpotDeal(accessToken: string, dealId: string): Promise<HubSpotDealResponse> {
+export async function fetchHubSpotDeal(auth: HubSpotAuth, dealId: string): Promise<HubSpotDealResponse> {
   const params = new URLSearchParams({
     properties: [
       "dealname",
@@ -154,18 +196,18 @@ export async function fetchHubSpotDeal(accessToken: string, dealId: string): Pro
     associations: "contacts",
   });
 
-  return hubspotRequest<HubSpotDealResponse>(`/crm/v3/objects/deals/${dealId}?${params.toString()}`, accessToken);
+  return hubspotRequest<HubSpotDealResponse>(`/crm/v3/objects/deals/${dealId}?${params.toString()}`, auth);
 }
 
 export async function listHubSpotDeals(
-  accessToken: string,
+  auth: HubSpotAuth,
   after?: string,
 ): Promise<{
   results: HubSpotDealResponse[];
   paging?: { next?: { after?: string } };
 }> {
   const params = new URLSearchParams({
-    limit: "100",
+    limit: "50",
     properties: [
       "dealname",
       "dealstage",
@@ -186,14 +228,14 @@ export async function listHubSpotDeals(
     params.set("after", after);
   }
 
-  return hubspotRequest(`/crm/v3/objects/deals?${params.toString()}`, accessToken);
+  return hubspotRequest(`/crm/v3/objects/deals?${params.toString()}`, auth);
 }
 
-export async function fetchHubSpotContact(accessToken: string, contactId: string) {
+export async function fetchHubSpotContact(auth: HubSpotAuth, contactId: string) {
   const params = new URLSearchParams({
     properties: ["email", "firstname", "lastname"].join(","),
     associations: "deals",
   });
 
-  return hubspotRequest<HubSpotContactResponse>(`/crm/v3/objects/contacts/${contactId}?${params.toString()}`, accessToken);
+  return hubspotRequest<HubSpotContactResponse>(`/crm/v3/objects/contacts/${contactId}?${params.toString()}`, auth);
 }

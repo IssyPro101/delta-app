@@ -111,6 +111,7 @@ async function fathomRequest<T>(path: string, accessToken: string): Promise<T> {
   });
 
   if (!response.ok) {
+    console.error(await response.text());
     throw new Error(`Fathom request failed: ${response.status}`);
   }
 

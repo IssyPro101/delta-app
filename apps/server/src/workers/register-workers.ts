@@ -5,9 +5,11 @@ import {
   getAnyConnectedIntegration,
   getIntegration,
   readAccessToken,
+  readRefreshToken,
   setSyncStatus,
   touchIntegrationSync,
   updateIntegrationStatus,
+  upsertIntegration,
 } from "../services/integration-service";
 import type {
   DealRecord,
@@ -27,12 +29,27 @@ import {
 import { connection, type BackfillJobData, type WebhookJobData } from "../queues";
 import { env } from "../utils/env";
 import {
+  createHubSpotAuth,
   fetchHubSpotContact,
   fetchHubSpotDeal,
   listHubSpotDeals,
+  type HubSpotAuth,
   type HubSpotDealResponse,
 } from "../integrations/hubspot";
 import { getFathomTranscript, listFathomMeetings } from "../integrations/fathom";
+
+function hubspotAuthFor(integration: IntegrationRecord): HubSpotAuth {
+  return createHubSpotAuth(
+    readAccessToken(integration),
+    readRefreshToken(integration),
+    async (tokens) => {
+      await upsertIntegration(integration.user_id, "hubspot", {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? null,
+      });
+    },
+  );
+}
 
 function deriveOutcome(stage: string, explicitlyWon?: string | null, explicitlyClosed?: string | null) {
   const normalized = stage.toLowerCase();
@@ -162,15 +179,15 @@ async function buildDealEmailLookup(userId: string, integration: IntegrationReco
     return lookup;
   }
 
-  const accessToken = readAccessToken(integration);
+  const auth = hubspotAuthFor(integration);
   const deals = await listDealsForUser(userId);
 
   for (const deal of deals) {
-    const rawDeal = await fetchHubSpotDeal(accessToken, deal.external_id);
+    const rawDeal = await fetchHubSpotDeal(auth, deal.external_id);
     const contactIds = rawDeal.associations?.contacts?.results.map((result) => result.id) ?? [];
 
     for (const contactId of contactIds) {
-      const contact = await fetchHubSpotContact(accessToken, contactId);
+      const contact = await fetchHubSpotContact(auth, contactId);
       const email = contact.properties.email?.trim().toLowerCase();
 
       if (email && !lookup.has(email)) {
@@ -194,8 +211,8 @@ function matchDealByParticipantEmails(emailLookup: Map<string, DealRecord>, part
   return null;
 }
 
-async function getDealForHubSpotContact(userId: string, accessToken: string, contactId: string) {
-  const contact = await fetchHubSpotContact(accessToken, contactId);
+async function getDealForHubSpotContact(userId: string, auth: HubSpotAuth, contactId: string) {
+  const contact = await fetchHubSpotContact(auth, contactId);
   const associatedDealIds = contact.associations?.deals?.results.map((result) => result.id) ?? [];
 
   if (associatedDealIds.length === 0) {
@@ -437,9 +454,9 @@ async function processHubSpotWebhookEvent(payload: Record<string, unknown>, inte
   }
 
   if (subscriptionType.startsWith("contact.")) {
-    const accessToken = readAccessToken(integration);
-    const contact = await fetchHubSpotContact(accessToken, objectId);
-    const deal = await getDealForHubSpotContact(userId, accessToken, objectId);
+    const auth = hubspotAuthFor(integration);
+    const contact = await fetchHubSpotContact(auth, objectId);
+    const deal = await getDealForHubSpotContact(userId, auth, objectId);
 
     await createEvent(userId, "hubspot", deal, {
       eventType: "contact_activity",
@@ -463,8 +480,8 @@ async function processHubSpotWebhookEvent(payload: Record<string, unknown>, inte
     return;
   }
 
-  const accessToken = readAccessToken(integration);
-  const rawDeal = await fetchHubSpotDeal(accessToken, objectId);
+  const auth = hubspotAuthFor(integration);
+  const rawDeal = await fetchHubSpotDeal(auth, objectId);
   const previousDeal = await getDealByExternalId(userId, objectId);
   const deal = await upsertDealSnapshot(userId, rawDeal);
 
@@ -561,14 +578,14 @@ async function processHubSpotWebhookEvent(payload: Record<string, unknown>, inte
 }
 
 async function runHubSpotBackfill(integration: IntegrationRecord) {
-  const accessToken = readAccessToken(integration);
+  const auth = hubspotAuthFor(integration);
   let after: string | undefined;
   const pipelines = new Set<string>();
 
   await replaceHubSpotBackfillData(integration.user_id);
 
   do {
-    const page = await listHubSpotDeals(accessToken, after);
+    const page = await listHubSpotDeals(auth, after);
 
     for (const rawDeal of page.results) {
       const deal = await upsertDealSnapshot(integration.user_id, rawDeal);
@@ -734,6 +751,7 @@ export function registerWorkers() {
         if (job.data.provider === "hubspot") {
           await runHubSpotBackfill(integration);
         } else {
+          console.log("Running Fathom backfill");
           await runFathomBackfill(integration);
         }
 
