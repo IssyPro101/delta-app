@@ -604,7 +604,7 @@ async function runHubSpotBackfill(integration: IntegrationRecord) {
 async function processFathomWebhookPayload(payload: Record<string, unknown>, integration: IntegrationRecord) {
   const accessToken = readAccessToken(integration);
   const meetingId = String(payload.meetingId ?? payload.meeting_id ?? payload.recordingId ?? payload.recording_id ?? "");
-  const page = await listFathomMeetings(accessToken, undefined, true);
+  const page = await listFathomMeetings(accessToken);
   const meeting = page.items.find((item) => item.id === meetingId) ?? null;
 
   if (!meeting) {
@@ -661,7 +661,7 @@ async function runFathomBackfill(integration: IntegrationRecord) {
   await replaceFathomBackfillData(integration.user_id);
 
   do {
-    const page = await listFathomMeetings(accessToken, cursor, true);
+    const page = await listFathomMeetings(accessToken, cursor);
 
     for (const meeting of page.items) {
       const transcript =
