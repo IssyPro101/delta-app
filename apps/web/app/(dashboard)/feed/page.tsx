@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import type { DealDetail, Event, EventsResponse } from "@pipeline-intelligence/shared";
@@ -16,6 +16,14 @@ const sourceTabs = [
 ];
 
 export default function FeedPage() {
+  return (
+    <Suspense>
+      <FeedPageContent />
+    </Suspense>
+  );
+}
+
+function FeedPageContent() {
   const searchParams = useSearchParams();
   const source = searchParams.get("source") ?? undefined;
   const dealId = searchParams.get("deal_id") ?? undefined;
@@ -71,15 +79,18 @@ export default function FeedPage() {
 
   if (!eventData && !error) {
     return (
-      <Panel className="bg-white/75">
-        <p className="text-sm text-[color:var(--muted)]">Loading activity feed...</p>
+      <Panel>
+        <div className="flex items-center gap-3">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--line-strong)] border-t-[color:var(--accent)]" />
+          <p className="text-sm text-[color:var(--muted)]">Loading activity feed...</p>
+        </div>
       </Panel>
     );
   }
 
   if (!eventData) {
     return (
-      <Panel className="border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)]">
+      <Panel className="border-[rgba(229,72,77,0.12)] bg-[color:var(--danger-soft)]">
         <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load activity feed."}</p>
       </Panel>
     );
@@ -106,7 +117,7 @@ export default function FeedPage() {
   const loadMoreHref = `/feed?${loadMoreQuery.toString()}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap gap-3">
         {sourceTabs.map((tab) => {
           return <PillLink key={tab.label} href={sourceHref(tab.value)} label={tab.label} active={source === tab.value || (!source && !tab.value)} />;

@@ -5,9 +5,9 @@ import type { Insight, Deal, InsightsResponse } from "@pipeline-intelligence/sha
 import { Panel } from "./ui";
 
 const categoryStyles: Record<Insight["category"], string> = {
-  leak: "bg-[color:var(--danger-soft)] text-[color:var(--danger)]",
+  leak: "bg-[color:var(--warn-soft)] text-[color:var(--warn)]",
   risk: "bg-[color:var(--danger-soft)] text-[color:var(--danger)]",
-  pattern: "bg-[color:var(--warn-soft)] text-[color:var(--warn)]",
+  pattern: "bg-[color:var(--accent-soft)] text-[color:var(--accent)]",
 };
 
 function evidenceLine(insight: Insight) {
@@ -42,23 +42,25 @@ export function InsightCard({
   const evidence = evidenceLine(insight);
 
   return (
-    <Panel className="bg-white/82">
+    <Panel>
       <div className="space-y-4">
-        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium uppercase ${categoryStyles[insight.category]}`}>
+        <span className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${categoryStyles[insight.category]}`}>
           {insight.category}
         </span>
         <div className="space-y-2">
-          <h3 className="text-2xl font-semibold tracking-[-0.05em]">{insight.title}</h3>
-          <p className="max-w-3xl text-sm leading-7 text-[color:var(--muted)]">{insight.description}</p>
+          <h3 className="font-[var(--font-display)] text-xl tracking-[-0.01em] text-[color:var(--text-strong)]">{insight.title}</h3>
+          <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--muted)]">{insight.description}</p>
         </div>
-        {evidence ? <p className="text-sm font-medium text-[color:var(--text)]">{evidence}</p> : null}
+        {evidence ? (
+          <p className="font-[var(--font-mono)] text-xs font-medium text-[color:var(--text)]">{evidence}</p>
+        ) : null}
         {deals.length > 0 ? (
           <p className="text-sm text-[color:var(--muted)]">
             Affected deals:{" "}
             {deals.slice(0, 2).map((deal, index) => (
               <span key={deal.id}>
                 {index > 0 ? ", " : null}
-                <Link href={`/feed?deal_id=${deal.id}`} className="font-medium text-[color:var(--text)] hover:underline">
+                <Link href={`/feed?deal_id=${deal.id}`} className="font-medium text-[color:var(--accent)] hover:underline">
                   {deal.company_name}
                 </Link>
               </span>

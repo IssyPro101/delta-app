@@ -5,11 +5,11 @@ export default function DashboardLoading() {
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
-            className="h-40 animate-pulse rounded-[28px] border border-[color:var(--line)] bg-white/60"
+            className="h-40 animate-pulse rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel)]"
           />
         ))}
       </div>
-      <div className="h-[520px] animate-pulse rounded-[28px] border border-[color:var(--line)] bg-white/60" />
+      <div className="h-[520px] animate-pulse rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel)]" />
     </div>
   );
 }

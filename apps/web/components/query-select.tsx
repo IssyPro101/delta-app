@@ -18,8 +18,10 @@ export function QuerySelect({
   const searchParams = useSearchParams();
 
   return (
-    <label className="inline-flex items-center gap-3 rounded-full border border-[color:var(--line)] bg-white/80 px-4 py-2 text-sm text-[color:var(--muted)]">
-      <span className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.22em]">{label ?? name}</span>
+    <label className="inline-flex items-center gap-2.5 rounded-xl border border-[color:var(--line)] bg-[color:var(--panel)] px-4 py-2 text-sm text-[color:var(--muted)] transition-colors hover:border-[color:var(--line-strong)]">
+      <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em]">
+        {label ?? name}
+      </span>
       <select
         value={value}
         onChange={(event) => {
@@ -34,7 +36,7 @@ export function QuerySelect({
         className="bg-transparent font-medium text-[color:var(--text)] outline-none"
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} className="bg-[var(--bg-elevated)] text-[color:var(--text)]">
             {option.label}
           </option>
         ))}

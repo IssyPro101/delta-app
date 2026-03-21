@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import type { Deal, DealsResponse, InsightsResponse } from "@pipeline-intelligence/shared";
@@ -17,6 +17,14 @@ const categories = [
 ];
 
 export default function InsightsPage() {
+  return (
+    <Suspense>
+      <InsightsPageContent />
+    </Suspense>
+  );
+}
+
+function InsightsPageContent() {
   const searchParams = useSearchParams();
   const category = searchParams.get("category") ?? undefined;
   const analyzer = searchParams.get("analyzer") ?? undefined;
@@ -68,15 +76,18 @@ export default function InsightsPage() {
 
   if ((!insightData || !dealData) && !error) {
     return (
-      <Panel className="bg-white/75">
-        <p className="text-sm text-[color:var(--muted)]">Loading insights...</p>
+      <Panel>
+        <div className="flex items-center gap-3">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--line-strong)] border-t-[color:var(--accent)]" />
+          <p className="text-sm text-[color:var(--muted)]">Loading insights...</p>
+        </div>
       </Panel>
     );
   }
 
   if (!insightData || !dealData) {
     return (
-      <Panel className="border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)]">
+      <Panel className="border-[rgba(229,72,77,0.12)] bg-[color:var(--danger-soft)]">
         <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load insights."}</p>
       </Panel>
     );
@@ -104,7 +115,7 @@ export default function InsightsPage() {
   const loadMoreHref = `/insights?${loadMoreQuery.toString()}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap gap-3">
         {categories.map((category) => {
           return <PillLink key={category.label} href={categoryHref(category.value)} label={category.label} active={searchParams.get("category") === category.value || (!searchParams.get("category") && !category.value)} />;
@@ -114,7 +125,7 @@ export default function InsightsPage() {
       {insightData.insights.length === 0 ? (
         <EmptyState
           title="No insights yet."
-          description="Insights are generated as deal data is analyzed. They’ll appear here once enough deals have closed."
+          description="Insights are generated as deal data is analyzed. They'll appear here once enough deals have closed."
         />
       ) : (
         <div className="space-y-4">

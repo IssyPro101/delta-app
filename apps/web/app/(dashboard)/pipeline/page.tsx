@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import type { PipelineResponse } from "@pipeline-intelligence/shared";
@@ -18,6 +18,14 @@ const periodOptions = [
 ];
 
 export default function PipelinePage() {
+  return (
+    <Suspense>
+      <PipelinePageContent />
+    </Suspense>
+  );
+}
+
+function PipelinePageContent() {
   const searchParams = useSearchParams();
   const pipelineName = searchParams.get("pipeline_name") ?? undefined;
   const period = searchParams.get("period") ?? "last_90_days";
@@ -56,15 +64,18 @@ export default function PipelinePage() {
 
   if (!data && !error) {
     return (
-      <Panel className="bg-white/75">
-        <p className="text-sm text-[color:var(--muted)]">Loading pipeline data...</p>
+      <Panel>
+        <div className="flex items-center gap-3">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--line-strong)] border-t-[color:var(--accent)]" />
+          <p className="text-sm text-[color:var(--muted)]">Loading pipeline data...</p>
+        </div>
       </Panel>
     );
   }
 
   if (!data) {
     return (
-      <Panel className="border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)]">
+      <Panel className="border-[rgba(229,72,77,0.12)] bg-[color:var(--danger-soft)]">
         <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load pipeline data."}</p>
       </Panel>
     );
@@ -76,8 +87,8 @@ export default function PipelinePage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-3">
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center gap-3">
         <QuerySelect label="Pipeline" name="pipeline_name" value={selectedPipeline} options={pipelineOptions} />
         <QuerySelect label="Period" name="period" value={period} options={periodOptions} />
       </div>

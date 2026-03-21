@@ -27,7 +27,7 @@ export function PipelineView({
         action={
           <Link
             href="/settings"
-            className="inline-flex rounded-full bg-[color:var(--text)] px-4 py-2 text-sm font-medium text-white"
+            className="inline-flex rounded-xl bg-gradient-to-r from-[#0e58dd] to-[#1d74e7] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_1px_8px_rgba(14,88,221,0.3)]"
           >
             Open Settings
           </Link>
@@ -49,7 +49,7 @@ export function PipelineView({
   const lowConversionThreshold = leakThreshold(data.stages);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {[
           { label: "Total Deals", value: data.summary.total_deals },
@@ -58,11 +58,14 @@ export function PipelineView({
           { label: "Win Rate", value: formatPercent(data.summary.overall_win_rate) },
           { label: "Avg Cycle", value: formatDays(data.summary.avg_deal_cycle_days) },
         ].map((card) => (
-          <Panel key={card.label} className="bg-white/80">
-            <p className="font-[var(--font-mono)] text-[11px] uppercase tracking-[0.24em] text-[color:var(--muted)]">
+          <Panel key={card.label} className="relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color:var(--accent)] to-transparent opacity-40" />
+            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">
               {card.label}
             </p>
-            <p className="mt-4 text-3xl font-semibold tracking-[-0.05em]">{card.value}</p>
+            <p className="mt-4 font-[var(--font-display)] text-[32px] tracking-[-0.02em] text-[color:var(--text-strong)]">
+              {card.value}
+            </p>
           </Panel>
         ))}
       </div>
@@ -70,7 +73,7 @@ export function PipelineView({
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
         <Panel>
           <SectionTitle eyebrow="Leak Detection" title="Funnel" />
-          <div className="mt-6 space-y-6">
+          <div className="mt-8 space-y-7">
             {data.stages.map((stage, index) => {
               const width = Math.max(20, Math.round((stage.deals_entered / firstStageCount) * 100));
               const leak = stage.conversion_rate < lowConversionThreshold;
@@ -79,19 +82,19 @@ export function PipelineView({
                 <div key={stage.name} className="space-y-3">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <span className="grid h-8 w-8 place-items-center rounded-full bg-[color:var(--accent-soft)] font-[var(--font-mono)] text-xs text-[color:var(--accent)]">
+                      <span className="grid h-6 w-6 place-items-center rounded-md bg-[color:var(--panel-strong)] font-[var(--font-mono)] text-[11px] text-[color:var(--muted)]">
                         {index + 1}
                       </span>
-                      <Link href={`/feed?stage=${encodeURIComponent(stage.name)}`} className="font-medium hover:underline">
+                      <Link href={`/feed?stage=${encodeURIComponent(stage.name)}`} className="text-sm font-medium text-[color:var(--text-strong)] transition-colors hover:text-[color:var(--accent)]">
                         {stage.name}
                       </Link>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-[color:var(--muted)]">
-                      <span>{stage.deals_entered} deals</span>
+                      <span className="font-[var(--font-mono)] text-xs">{stage.deals_entered}</span>
                       {leak ? (
                         <Link
                           href={`/insights?analyzer=stage_leak&stage=${encodeURIComponent(stage.name)}`}
-                          className="rounded-full bg-[color:var(--warn-soft)] px-3 py-1 text-[color:var(--warn)]"
+                          className="rounded-md bg-[color:var(--warn-soft)] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--warn)]"
                         >
                           Leak
                         </Link>
@@ -99,15 +102,17 @@ export function PipelineView({
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="h-4 flex-1 overflow-hidden rounded-full bg-[color:var(--bg-strong)]">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[color:var(--panel-strong)]">
                       <div
-                        className={`h-full rounded-full ${
-                          leak ? "bg-[color:var(--warn)]" : "bg-[color:var(--accent)]"
+                        className={`h-full rounded-full transition-all duration-700 ${
+                          leak
+                            ? "bg-gradient-to-r from-[#f0953e] to-[#d97706]"
+                            : "bg-gradient-to-r from-[#0e58dd] to-[#1d74e7]"
                         }`}
                         style={{ width: `${width}%` }}
                       />
                     </div>
-                    <span className="w-14 text-right text-sm font-medium">{formatPercent(stage.conversion_rate)}</span>
+                    <span className="w-14 text-right font-[var(--font-mono)] text-xs font-medium text-[color:var(--text)]">{formatPercent(stage.conversion_rate)}</span>
                   </div>
                 </div>
               );
@@ -117,35 +122,35 @@ export function PipelineView({
 
         <Panel>
           <SectionTitle eyebrow="Velocity" title="Stage Health" />
-          <div className="mt-6 overflow-hidden rounded-[22px] border border-[color:var(--line)]">
-            <table className="min-w-full divide-y divide-[color:var(--line)] text-sm">
-              <thead className="bg-white/70">
-                <tr className="text-left text-[color:var(--muted)]">
+          <div className="mt-6 overflow-hidden rounded-xl border border-[color:var(--line)]">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-[color:var(--line)] text-left">
                   {["Stage", "Conv.", "Won avg", "Lost avg", "Gap"].map((label) => (
-                    <th key={label} className="px-4 py-3 font-medium">
+                    <th key={label} className="bg-[color:var(--panel-strong)] px-4 py-3 font-[var(--font-mono)] text-[10px] font-medium uppercase tracking-wider text-[color:var(--muted)]">
                       {label}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[color:var(--line)] bg-white/50">
+              <tbody className="divide-y divide-[color:var(--line)]">
                 {data.stages.map((stage) => {
                   const gap = stage.avg_days_in_stage_lost - stage.avg_days_in_stage_won;
                   const flag = stage.avg_days_in_stage_won > 0 && gap > stage.avg_days_in_stage_won * 2;
 
                   return (
-                    <tr key={stage.name}>
-                      <td className="px-4 py-4 font-medium">{stage.name}</td>
-                      <td className="px-4 py-4">{formatPercent(stage.conversion_rate)}</td>
-                      <td className="px-4 py-4">{formatDays(stage.avg_days_in_stage_won)}</td>
-                      <td className="px-4 py-4">{formatDays(stage.avg_days_in_stage_lost)}</td>
-                      <td className={`px-4 py-4 ${flag ? "text-[color:var(--warn)]" : "text-[color:var(--muted)]"}`}>
+                    <tr key={stage.name} className="transition-colors hover:bg-[color:var(--panel)]">
+                      <td className="px-4 py-3.5 font-medium text-[color:var(--text-strong)]">{stage.name}</td>
+                      <td className="px-4 py-3.5 font-[var(--font-mono)] text-xs text-[color:var(--muted)]">{formatPercent(stage.conversion_rate)}</td>
+                      <td className="px-4 py-3.5 font-[var(--font-mono)] text-xs text-[color:var(--muted)]">{formatDays(stage.avg_days_in_stage_won)}</td>
+                      <td className="px-4 py-3.5 font-[var(--font-mono)] text-xs text-[color:var(--muted)]">{formatDays(stage.avg_days_in_stage_lost)}</td>
+                      <td className={`px-4 py-3.5 font-[var(--font-mono)] text-xs ${flag ? "text-[color:var(--warn)]" : "text-[color:var(--muted)]"}`}>
                         <span className="inline-flex items-center gap-2">
                           <span>
                             {gap > 0 ? "+" : ""}
                             {formatDays(gap)}
                           </span>
-                          {flag ? <span className="text-xs font-medium uppercase">Leak</span> : null}
+                          {flag ? <span className="text-[10px] font-semibold uppercase">Leak</span> : null}
                         </span>
                       </td>
                     </tr>

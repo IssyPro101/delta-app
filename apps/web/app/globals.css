@@ -1,22 +1,39 @@
 @import "tailwindcss";
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 :root {
-  --bg: #f6efe1;
-  --bg-strong: #efe4d0;
-  --panel: rgba(252, 248, 242, 0.9);
-  --panel-strong: #fffaf2;
-  --line: rgba(63, 71, 60, 0.12);
-  --text: #1d2b25;
-  --muted: #5b6b63;
-  --accent: #0f766e;
-  --accent-soft: rgba(15, 118, 110, 0.14);
-  --warn: #b45309;
-  --warn-soft: rgba(180, 83, 9, 0.14);
-  --danger: #b42318;
-  --danger-soft: rgba(180, 35, 24, 0.12);
-  --shadow: 0 24px 60px rgba(49, 43, 31, 0.12);
-  --font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  --font-mono: "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
+  --bg: #09090c;
+  --bg-elevated: #111114;
+  --sidebar: #060609;
+  --panel: rgba(255, 255, 255, 0.028);
+  --panel-strong: rgba(255, 255, 255, 0.055);
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --text: #a3a09b;
+  --text-strong: #edebe8;
+  --muted: rgba(163, 160, 155, 0.55);
+  --accent: #1d74e7;
+  --accent-hover: #0e58dd;
+  --accent-soft: rgba(29, 116, 231, 0.08);
+  --success: #3ecf8e;
+  --success-soft: rgba(62, 207, 142, 0.08);
+  --warn: #f0953e;
+  --warn-soft: rgba(240, 149, 62, 0.08);
+  --danger: #e5484d;
+  --danger-soft: rgba(229, 72, 77, 0.06);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --font-sans: var(--font-plus-jakarta-sans, "Plus Jakarta Sans"), system-ui, sans-serif;
+  --font-display: var(--font-instrument-serif, "Instrument Serif"), Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono, "JetBrains Mono"), "SF Mono", monospace;
 }
 
 * {
@@ -25,16 +42,17 @@
 
 html {
   min-height: 100%;
-  background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(180, 83, 9, 0.12), transparent 28%),
-    var(--bg);
+  background: var(--bg);
+  scroll-behavior: smooth;
 }
 
 body {
   min-height: 100vh;
   color: var(--text);
-  background: transparent;
+  background:
+    radial-gradient(ellipse 60% 40% at 0% 0%, rgba(14, 88, 221, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 30% at 100% 100%, rgba(1, 47, 189, 0.04) 0%, transparent 40%),
+    var(--bg);
 }
 
 a {
@@ -47,5 +65,24 @@ button {
 }
 
 ::selection {
-  background: rgba(15, 118, 110, 0.2);
+  background: rgba(29, 116, 231, 0.35);
+  color: var(--text-strong);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
