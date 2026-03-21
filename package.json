@@ -1,0 +1,19 @@
+{
+  "name": "pipeline-intelligence",
+  "private": true,
+  "packageManager": "yarn@1.22.19",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
