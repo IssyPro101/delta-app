@@ -60,7 +60,7 @@ export function InsightCard({
             {deals.slice(0, 2).map((deal, index) => (
               <span key={deal.id}>
                 {index > 0 ? ", " : null}
-                <Link href={`/feed?deal_id=${deal.id}`} className="font-medium text-[color:var(--accent)] hover:underline">
+                <Link href={`/deals/${deal.id}`} className="font-medium text-[color:var(--accent)] hover:underline">
                   {deal.company_name}
                 </Link>
               </span>

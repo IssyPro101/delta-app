@@ -117,7 +117,7 @@ export function FeedList({
 }>) {
   const clearDealHref = buildFeedHref(baseQuery, { deal_id: null, event: null, offset: null });
   const closeEventHref = buildFeedHref(baseQuery, { event: null });
-  const showDealHref = activeEvent?.deal ? buildFeedHref(baseQuery, { deal_id: activeEvent.deal.id, event: null }) : null;
+  const showDealHref = activeEvent?.deal ? `/deals/${activeEvent.deal.id}` : null;
   const meetingMetadata = activeEvent?.metadata as EventMetadata & Record<string, unknown> | undefined;
   const recordingUrl = typeof meetingMetadata?.recording_url === "string" ? meetingMetadata.recording_url : null;
   const transcriptUrl = typeof meetingMetadata?.transcript_url === "string" ? meetingMetadata.transcript_url : null;
