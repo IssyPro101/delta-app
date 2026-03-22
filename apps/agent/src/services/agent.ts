@@ -41,20 +41,6 @@ function getLatestUserMessageText(messages: Array<{ role: string; parts: Array<{
   return "";
 }
 
-function assertExplicitWriteIntent(userText: string, actionLabel: string) {
-  const explicitPatterns = [
-    /\b(log|save|record|create|add|schedule|queue|put)\b/,
-    /\b(hubspot|crm)\b/,
-    /\b(note|task|email)\b/,
-  ];
-
-  if (!explicitPatterns.every((pattern) => pattern.test(userText))) {
-    throw new Error(
-      `The user did not explicitly ask to ${actionLabel} in HubSpot. Draft the action first, then wait for a clear confirmation.`,
-    );
-  }
-}
-
 async function getHubSpotTargetsForDeal(userId: string, dealId: string, accessToken: string) {
   const detail = await getDealContext(accessToken, dealId);
   const remoteDeal = await fetchHubSpotDealForUser(userId, detail.deal.external_id);
@@ -163,7 +149,6 @@ export function createSalesAgent(input: {
           note: z.string().min(1),
         }),
         execute: async ({ deal_id, note }) => {
-          assertExplicitWriteIntent(latestUserMessage, "save a note");
           const targets = await getHubSpotTargetsForDeal(userId, deal_id, accessToken);
 
           return createHubSpotNoteForUser(userId, {
@@ -184,7 +169,6 @@ export function createSalesAgent(input: {
           task_type: z.enum(["EMAIL", "CALL", "TODO"]).optional(),
         }),
         execute: async ({ deal_id, subject, body, due_at, priority, task_type }) => {
-          assertExplicitWriteIntent(latestUserMessage, "create a task");
           const targets = await getHubSpotTargetsForDeal(userId, deal_id, accessToken);
 
           return createHubSpotTaskForUser(userId, {
@@ -207,7 +191,6 @@ export function createSalesAgent(input: {
           html: z.string().optional(),
         }),
         execute: async ({ deal_id, subject, text, html }) => {
-          assertExplicitWriteIntent(latestUserMessage, "save an email");
           const targets = await getHubSpotTargetsForDeal(userId, deal_id, accessToken);
 
           return createHubSpotEmailForUser(userId, {

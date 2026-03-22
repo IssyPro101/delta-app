@@ -169,7 +169,7 @@ function AgentConversationThread({
   const transport = useMemo(
     () =>
       new DefaultChatTransport<UIMessage>({
-        api: "/api/agent/chat",
+        api: "/agent-api/chat",
         body: {
           conversation_id: conversationId,
         },

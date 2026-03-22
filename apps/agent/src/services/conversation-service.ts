@@ -182,29 +182,27 @@ export async function saveConversationMessages(
       .eq("user_id", userId),
   );
 
-  assertNoError(
-    await supabase
-      .from("agent_messages")
-      .delete()
-      .eq("conversation_id", conversationId)
-      .eq("user_id", userId),
-  );
-
   if (messages.length === 0) {
     return;
   }
 
+  // Upsert messages using the (conversation_id, message_id) unique constraint.
+  // This inserts new messages and updates existing ones in place, avoiding
+  // the need to delete and re-insert the entire conversation on every save.
   assertNoError(
-    await supabase.from("agent_messages").insert(
-      messages.map((message, index) => ({
-        conversation_id: conversationId,
-        user_id: userId,
-        message_id: message.id,
-        position: index,
-        role: message.role,
-        parts: normalizeMessageParts(message.parts),
-        created_at: timestamp,
-      })),
-    ),
+    await supabase
+      .from("agent_messages")
+      .upsert(
+        messages.map((message, index) => ({
+          conversation_id: conversationId,
+          user_id: userId,
+          message_id: message.id,
+          position: index,
+          role: message.role,
+          parts: normalizeMessageParts(message.parts),
+          created_at: timestamp,
+        })),
+        { onConflict: "conversation_id,message_id", ignoreDuplicates: false },
+      ),
   );
 }

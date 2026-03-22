@@ -129,6 +129,7 @@ async function main() {
           await saveConversationMessages(request.authUser!.id, conversationId, messages);
         },
         onError: (error) => {
+          console.error(error);
           request.log.error({ error }, "Agent stream failed");
           return "The agent hit an error while generating the response.";
         },

@@ -37,16 +37,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function listAgentConversations() {
-  return request<AgentConversationListResponse>("/api/agent/conversations");
+  return request<AgentConversationListResponse>("/agent-api/conversations");
 }
 
 export async function createAgentConversation(title?: string) {
-  return request<AgentConversation>("/api/agent/conversations", {
+  return request<AgentConversation>("/agent-api/conversations", {
     method: "POST",
     body: JSON.stringify(title ? { title } : {}),
   });
 }
 
 export async function getAgentConversation(conversationId: string) {
-  return request<AgentConversationDetailResponse>(`/api/agent/conversations/${conversationId}/messages`);
+  return request<AgentConversationDetailResponse>(`/agent-api/conversations/${conversationId}/messages`);
 }

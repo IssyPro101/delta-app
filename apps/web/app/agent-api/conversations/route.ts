@@ -1,4 +1,4 @@
-import { proxyAgentRequest } from "../../../../lib/agent-proxy";
+import { proxyAgentRequest } from "../../../lib/agent-proxy";
 
 export async function GET(request: Request) {
   return proxyAgentRequest(request, "/api/agent/conversations");
