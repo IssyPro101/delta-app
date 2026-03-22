@@ -30,10 +30,13 @@ import { connection, type BackfillJobData, type WebhookJobData } from "../queues
 import { env } from "../utils/env";
 import {
   createHubSpotAuth,
+  fetchHubSpotActivity,
   fetchHubSpotContact,
   fetchHubSpotDeal,
   listHubSpotDeals,
   type HubSpotAuth,
+  type HubSpotActivityObjectType,
+  type HubSpotActivityResponse,
   type HubSpotDealResponse,
 } from "../integrations/hubspot";
 import { getFathomTranscript, listFathomMeetings } from "../integrations/fathom";
@@ -96,6 +99,36 @@ function buildAmountHistory(rawDeal: HubSpotDealResponse) {
       amount: centsFromAmount(item.value),
       timestamp: new Date(item.timestamp),
     }));
+}
+
+function uniqueIds(values: Array<string | null | undefined>) {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+function toActivitySnippet(value: string | null | undefined, limit = 160) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized;
+}
+
+function parseHubSpotTimestamp(value: string | null | undefined, fallback: Date) {
+  if (!value) {
+    return fallback;
+  }
+
+  const numeric = Number(value);
+  const date = Number.isFinite(numeric) ? new Date(numeric) : new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date;
+}
+
+function getAssociatedIds(
+  associations: HubSpotDealResponse["associations"] | HubSpotActivityResponse["associations"] | undefined,
+  associationType: string,
+) {
+  return associations?.[associationType]?.results.map((result) => result.id) ?? [];
 }
 
 function normalizeEmails(emails: string[]) {
@@ -225,6 +258,151 @@ async function getDealForHubSpotContact(userId: string, auth: HubSpotAuth, conta
   const deals = rows.map(toDealRecord).sort((left, right) => right.last_activity.getTime() - left.last_activity.getTime());
 
   return deals[0] ?? null;
+}
+
+async function hasHubSpotActivityEvent(userId: string, activityKey: string) {
+  const rows = assertData(
+    await supabase
+      .from("events")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("source", "hubspot")
+      .contains("metadata", { hubspot_activity_id: activityKey })
+      .limit(1),
+  );
+
+  return rows.length > 0;
+}
+
+function formatHubSpotActivity(activityType: HubSpotActivityObjectType, activity: HubSpotActivityResponse) {
+  const properties = activity.properties;
+
+  switch (activityType) {
+    case "emails": {
+      const subject = properties.hs_email_subject ?? "Email";
+      const preview = toActivitySnippet(properties.hs_email_text);
+
+      return {
+        occurredAt: parseHubSpotTimestamp(properties.hs_timestamp, new Date()),
+        title: `HubSpot Email — ${subject}`,
+        summary: preview ?? "Email activity was logged in HubSpot.",
+        metadata: {
+          activity_type: "email",
+          subject,
+          body_preview: preview,
+          status: properties.hs_email_status ?? null,
+          direction: properties.hs_email_direction ?? null,
+        },
+      };
+    }
+    case "notes": {
+      const preview = toActivitySnippet(properties.hs_note_body);
+
+      return {
+        occurredAt: parseHubSpotTimestamp(properties.hs_timestamp, new Date()),
+        title: "HubSpot Note",
+        summary: preview ?? "Note activity was logged in HubSpot.",
+        metadata: {
+          activity_type: "note",
+          body_preview: preview,
+        },
+      };
+    }
+    case "calls": {
+      const title = properties.hs_call_title ?? "Call";
+      const preview = toActivitySnippet(properties.hs_call_body);
+
+      return {
+        occurredAt: parseHubSpotTimestamp(properties.hs_timestamp, new Date()),
+        title: `HubSpot Call — ${title}`,
+        summary: preview ?? "Call activity was logged in HubSpot.",
+        metadata: {
+          activity_type: "call",
+          subject: title,
+          body_preview: preview,
+          status: properties.hs_call_status ?? null,
+          direction: properties.hs_call_direction ?? null,
+        },
+      };
+    }
+    case "tasks": {
+      const subject = properties.hs_task_subject ?? properties.hs_task_type ?? "Task";
+      const preview = toActivitySnippet(properties.hs_task_body);
+
+      return {
+        occurredAt: parseHubSpotTimestamp(properties.hs_timestamp, new Date()),
+        title: `HubSpot Task — ${subject}`,
+        summary: preview ?? "Task activity was logged in HubSpot.",
+        metadata: {
+          activity_type: "task",
+          subject,
+          body_preview: preview,
+          status: properties.hs_task_status ?? null,
+          priority: properties.hs_task_priority ?? null,
+          task_type: properties.hs_task_type ?? null,
+        },
+      };
+    }
+  }
+}
+
+async function syncHubSpotDealActivities(
+  userId: string,
+  auth: HubSpotAuth,
+  deal: DealRecord,
+  rawDeal: HubSpotDealResponse,
+) {
+  const activityTypes: HubSpotActivityObjectType[] = ["emails", "notes", "calls", "tasks"];
+  let importedCount = 0;
+
+  for (const activityType of activityTypes) {
+    const activityIds = uniqueIds(getAssociatedIds(rawDeal.associations, activityType));
+
+    for (const activityId of activityIds) {
+      const activityKey = `${activityType}:${activityId}`;
+
+      if (await hasHubSpotActivityEvent(userId, activityKey)) {
+        continue;
+      }
+
+      const activity = await fetchHubSpotActivity(auth, activityType, activityId);
+      const relatedDealIds = uniqueIds([
+        ...getAssociatedIds(activity.associations, "deals"),
+        ...getAssociatedIds(rawDeal.associations, "deals"),
+        rawDeal.id,
+      ]);
+
+      if (!relatedDealIds.includes(deal.external_id)) {
+        continue;
+      }
+
+      const formatted = formatHubSpotActivity(activityType, activity);
+      const relatedContactIds = uniqueIds([
+        ...getAssociatedIds(activity.associations, "contacts"),
+        ...getAssociatedIds(rawDeal.associations, "contacts"),
+      ]);
+
+      await createEvent(userId, "hubspot", deal, {
+        eventType: "contact_activity",
+        title: formatted.title,
+        summary: formatted.summary,
+        occurredAt: formatted.occurredAt,
+        metadata: {
+          ...formatted.metadata,
+          hubspot_activity_id: activityKey,
+          hubspot_activity_object_id: activity.id,
+          hubspot_activity_object_type: activityType,
+          related_contact_ids: relatedContactIds,
+          contact_email: null,
+          contact_name: null,
+        },
+        rawPayload: activity as unknown as Record<string, unknown>,
+      });
+      importedCount += 1;
+    }
+  }
+
+  return importedCount;
 }
 
 async function createEvent(

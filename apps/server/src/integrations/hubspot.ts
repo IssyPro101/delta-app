@@ -10,6 +10,12 @@ const hubspotScopes = [
   "crm.objects.contacts.write"
 ];
 
+const hubspotDealAssociationTypes = ["contacts", "emails", "notes", "calls", "tasks"] as const;
+const hubspotActivityObjectTypes = ["emails", "notes", "calls", "tasks"] as const;
+
+export type HubSpotDealAssociationType = (typeof hubspotDealAssociationTypes)[number];
+export type HubSpotActivityObjectType = (typeof hubspotActivityObjectTypes)[number];
+
 export interface HubSpotTokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -61,13 +67,16 @@ export interface HubSpotDealResponse {
       sourceType?: string;
     }>
   >;
-  associations?: {
-    contacts?: {
-      results: Array<{
-        id: string;
-      }>;
-    };
-  };
+  associations?: Partial<
+    Record<
+      HubSpotDealAssociationType,
+      {
+        results: Array<{
+          id: string;
+        }>;
+      }
+    >
+  >;
 }
 
 export interface HubSpotContactResponse {
@@ -81,6 +90,48 @@ export interface HubSpotContactResponse {
     };
   };
 }
+
+export interface HubSpotActivityResponse {
+  id: string;
+  properties: Record<string, string | null>;
+  associations?: Record<
+    string,
+    {
+      results: Array<{
+        id: string;
+      }>;
+    }
+  >;
+}
+
+const hubspotActivityProperties: Record<HubSpotActivityObjectType, string[]> = {
+  emails: [
+    "hs_timestamp",
+    "hs_email_subject",
+    "hs_email_text",
+    "hs_email_status",
+    "hs_email_direction",
+  ],
+  notes: [
+    "hs_timestamp",
+    "hs_note_body",
+  ],
+  calls: [
+    "hs_timestamp",
+    "hs_call_title",
+    "hs_call_body",
+    "hs_call_status",
+    "hs_call_direction",
+  ],
+  tasks: [
+    "hs_timestamp",
+    "hs_task_subject",
+    "hs_task_body",
+    "hs_task_status",
+    "hs_task_priority",
+    "hs_task_type",
+  ],
+};
 
 function ensureHubSpotEnv() {
   if (!env.hubspotClientId || !env.hubspotClientSecret || !env.hubspotRedirectUri) {
@@ -193,7 +244,7 @@ export async function fetchHubSpotDeal(auth: HubSpotAuth, dealId: string): Promi
       "company_name",
     ].join(","),
     propertiesWithHistory: ["dealstage", "amount", "closedate", "hs_is_closed_won"].join(","),
-    associations: "contacts",
+    associations: hubspotDealAssociationTypes.join(","),
   });
 
   return hubspotRequest<HubSpotDealResponse>(`/crm/v3/objects/deals/${dealId}?${params.toString()}`, auth);
@@ -221,7 +272,7 @@ export async function listHubSpotDeals(
       "company_name",
     ].join(","),
     propertiesWithHistory: ["dealstage", "amount", "closedate", "hs_is_closed_won"].join(","),
-    associations: "contacts",
+    associations: hubspotDealAssociationTypes.join(","),
   });
 
   if (after) {
@@ -238,4 +289,20 @@ export async function fetchHubSpotContact(auth: HubSpotAuth, contactId: string) 
   });
 
   return hubspotRequest<HubSpotContactResponse>(`/crm/v3/objects/contacts/${contactId}?${params.toString()}`, auth);
+}
+
+export async function fetchHubSpotActivity(
+  auth: HubSpotAuth,
+  objectType: HubSpotActivityObjectType,
+  objectId: string,
+): Promise<HubSpotActivityResponse> {
+  const params = new URLSearchParams({
+    properties: hubspotActivityProperties[objectType].join(","),
+    associations: "deals,contacts",
+  });
+
+  return hubspotRequest<HubSpotActivityResponse>(
+    `/crm/v3/objects/${objectType}/${objectId}?${params.toString()}`,
+    auth,
+  );
 }
