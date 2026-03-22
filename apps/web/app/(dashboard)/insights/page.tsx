@@ -1,13 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
-import type { Deal, DealsResponse, InsightsResponse } from "@pipeline-intelligence/shared";
+import type { Deal } from "@pipeline-intelligence/shared";
 
+import { useDashboardData } from "../../../components/dashboard-data-provider";
 import { InsightCard } from "../../../components/insight-card";
 import { EmptyState, Panel, PillLink, SectionTitle } from "../../../components/ui";
-import { apiFetch, toErrorMessage } from "../../../lib/api";
 
 const categories = [
   { label: "All", value: "" },
@@ -31,50 +31,35 @@ function InsightsPageContent() {
   const stage = searchParams.get("stage") ?? undefined;
   const limit = 50;
   const offset = Number(searchParams.get("offset") ?? "0");
-  const [insightData, setInsightData] = useState<InsightsResponse | null>(null);
-  const [dealData, setDealData] = useState<DealsResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const query = new URLSearchParams();
+  const { data, error, loading } = useDashboardData();
+  const filteredInsights = useMemo(() => {
+    if (!data) {
+      return [];
+    }
 
-  if (category) query.set("category", category);
-  if (analyzer) query.set("analyzer", analyzer);
-  if (stage) query.set("stage", stage);
-  query.set("is_active", "true");
-  query.set("limit", String(limit));
-  query.set("offset", String(offset));
-  const queryString = query.toString();
-
-  useEffect(() => {
-    let active = true;
-
-    setInsightData(null);
-    setDealData(null);
-    setError(null);
-
-    void (async () => {
-      try {
-        const [nextInsightData, nextDealData] = await Promise.all([
-          apiFetch<InsightsResponse>(`/api/insights?${queryString}`),
-          apiFetch<DealsResponse>("/api/deals?limit=200"),
-        ]);
-
-        if (active) {
-          setInsightData(nextInsightData);
-          setDealData(nextDealData);
-        }
-      } catch (error) {
-        if (active) {
-          setError(toErrorMessage(error));
-        }
+    return data.insights.filter((insight) => {
+      if (!insight.is_active) {
+        return false;
       }
-    })();
 
-    return () => {
-      active = false;
-    };
-  }, [queryString]);
+      if (category && insight.category !== category) {
+        return false;
+      }
 
-  if ((!insightData || !dealData) && !error) {
+      if (analyzer && insight.analyzer !== analyzer) {
+        return false;
+      }
+
+      if (stage && insight.data.stage !== stage) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [analyzer, category, data, stage]);
+  const visibleInsights = filteredInsights.slice(offset, offset + limit);
+
+  if (!data && loading) {
     return (
       <Panel>
         <div className="flex items-center gap-3">
@@ -85,7 +70,7 @@ function InsightsPageContent() {
     );
   }
 
-  if (!insightData || !dealData) {
+  if (!data) {
     return (
       <Panel className="border-[rgba(229,72,77,0.12)] bg-[color:var(--danger-soft)]">
         <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load insights."}</p>
@@ -93,8 +78,8 @@ function InsightsPageContent() {
     );
   }
 
-  const dealLookup = new Map<string, Deal>(dealData.deals.map((deal) => [deal.id, deal]));
-  const hasMore = offset + insightData.insights.length < insightData.total;
+  const dealLookup = new Map<string, Deal>(data.deals.map((deal) => [deal.id, deal]));
+  const hasMore = offset + visibleInsights.length < filteredInsights.length;
 
   function categoryHref(category: string) {
     const nextQuery = new URLSearchParams();
@@ -122,14 +107,14 @@ function InsightsPageContent() {
         })}
       </div>
       <SectionTitle eyebrow="Analyzers" title="Findings derived from deal flow and activity" />
-      {insightData.insights.length === 0 ? (
+      {visibleInsights.length === 0 ? (
         <EmptyState
           title="No insights yet."
           description="Insights are generated as deal data is analyzed. They'll appear here once enough deals have closed."
         />
       ) : (
         <div className="space-y-4">
-          {insightData.insights.map((insight) => (
+          {visibleInsights.map((insight) => (
             <InsightCard key={insight.id} insight={insight} dealLookup={dealLookup} />
           ))}
           {hasMore ? (

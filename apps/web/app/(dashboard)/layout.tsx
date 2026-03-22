@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AppShell } from "../../components/app-shell";
 import { useAuth } from "../../components/auth-provider";
+import { DashboardDataProvider } from "../../components/dashboard-data-provider";
 
 function inferTitle(pathname: string) {
   if (pathname.startsWith("/insights")) return "Insights";
@@ -65,7 +66,7 @@ function DashboardLayoutContent({ children }: Readonly<{ children: React.ReactNo
       onSignOut={signOut}
       signingOut={signingOut}
     >
-      {children}
+      <DashboardDataProvider>{children}</DashboardDataProvider>
     </AppShell>
   );
 }

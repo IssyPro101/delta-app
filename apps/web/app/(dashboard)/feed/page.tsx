@@ -1,13 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
-import type { DealDetail, Event, EventsResponse } from "@pipeline-intelligence/shared";
-
+import { useDashboardData } from "../../../components/dashboard-data-provider";
 import { FeedList } from "../../../components/feed-view";
 import { EmptyState, Panel, PillLink, SectionTitle } from "../../../components/ui";
-import { apiFetch, toErrorMessage } from "../../../lib/api";
 
 const sourceTabs = [
   { label: "All", value: "" },
@@ -31,10 +29,7 @@ function FeedPageContent() {
   const stage = searchParams.get("stage") ?? undefined;
   const limit = 50;
   const offset = Number(searchParams.get("offset") ?? "0");
-  const [eventData, setEventData] = useState<EventsResponse | null>(null);
-  const [activeEvent, setActiveEvent] = useState<Event | null>(null);
-  const [dealFilter, setDealFilter] = useState<DealDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, loading } = useDashboardData();
   const query = new URLSearchParams();
 
   if (source) query.set("source", source);
@@ -42,42 +37,44 @@ function FeedPageContent() {
   if (stage) query.set("stage", stage);
   query.set("limit", String(limit));
   query.set("offset", String(offset));
-  const queryString = query.toString();
+  const filteredEvents = useMemo(() => {
+    if (!data) {
+      return [];
+    }
 
-  useEffect(() => {
-    let active = true;
-
-    setEventData(null);
-    setActiveEvent(null);
-    setDealFilter(null);
-    setError(null);
-
-    void (async () => {
-      try {
-        const [nextEventData, nextActiveEvent, nextDealFilter] = await Promise.all([
-          apiFetch<EventsResponse>(`/api/events?${queryString}`),
-          eventId ? apiFetch<Event>(`/api/events/${eventId}`) : Promise.resolve(null),
-          dealId ? apiFetch<DealDetail>(`/api/deals/${dealId}`) : Promise.resolve(null),
-        ]);
-
-        if (active) {
-          setEventData(nextEventData);
-          setActiveEvent(nextActiveEvent);
-          setDealFilter(nextDealFilter);
-        }
-      } catch (error) {
-        if (active) {
-          setError(toErrorMessage(error));
-        }
+    return data.events.filter((event) => {
+      if (source && event.source !== source) {
+        return false;
       }
-    })();
 
-    return () => {
-      active = false;
-    };
-  }, [dealId, eventId, queryString]);
+      if (dealId && event.deal_id !== dealId) {
+        return false;
+      }
 
-  if (!eventData && !error) {
+      if (stage && event.deal?.stage !== stage) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [data, dealId, source, stage]);
+  const visibleEvents = filteredEvents.slice(offset, offset + limit);
+  const activeEvent = useMemo(() => {
+    if (!data || !eventId) {
+      return null;
+    }
+
+    return data.events.find((event) => event.id === eventId) ?? null;
+  }, [data, eventId]);
+  const dealFilter = useMemo(() => {
+    if (!data || !dealId) {
+      return null;
+    }
+
+    return data.deals.find((deal) => deal.id === dealId) ?? null;
+  }, [data, dealId]);
+
+  if (!data && loading) {
     return (
       <Panel>
         <div className="flex items-center gap-3">
@@ -88,7 +85,7 @@ function FeedPageContent() {
     );
   }
 
-  if (!eventData) {
+  if (!data) {
     return (
       <Panel className="border-[rgba(229,72,77,0.12)] bg-[color:var(--danger-soft)]">
         <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load activity feed."}</p>
@@ -96,7 +93,7 @@ function FeedPageContent() {
     );
   }
 
-  const hasMore = offset + eventData.events.length < eventData.total;
+  const hasMore = offset + visibleEvents.length < filteredEvents.length;
 
   function sourceHref(source: string) {
     const nextQuery = new URLSearchParams();
@@ -124,14 +121,14 @@ function FeedPageContent() {
         })}
       </div>
       <SectionTitle eyebrow="Inspection Layer" title="Raw chronological activity across every deal" />
-      {eventData.events.length === 0 ? (
+      {visibleEvents.length === 0 ? (
         <EmptyState
           title="No events yet."
           description="Once your integrations are syncing, activity will appear here."
         />
       ) : (
         <FeedList
-          events={eventData.events}
+          events={visibleEvents}
           activeEvent={activeEvent}
           dealFilter={dealFilter}
           baseQuery={query}

@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import type { Integration, IntegrationProvider } from "@pipeline-intelligence/shared";
 
+import { useDashboardData } from "../../../components/dashboard-data-provider";
 import { IntegrationActions } from "../../../components/integration-actions";
 import { Panel, SectionTitle } from "../../../components/ui";
-import { apiFetch, toErrorMessage } from "../../../lib/api";
 
 const providerContent: Record<
   IntegrationProvider,
@@ -53,36 +51,10 @@ function statusDot(integration?: Integration) {
 }
 
 export default function SettingsPage() {
-  const [integrations, setIntegrations] = useState<Integration[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { data, error, loading, refresh } = useDashboardData();
+  const integrations = data?.integrations ?? null;
 
-  useEffect(() => {
-    let active = true;
-
-    setIntegrations(null);
-    setError(null);
-
-    void (async () => {
-      try {
-        const nextIntegrations = await apiFetch<Integration[]>("/api/integrations");
-
-        if (active) {
-          setIntegrations(nextIntegrations);
-        }
-      } catch (error) {
-        if (active) {
-          setError(toErrorMessage(error));
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [refreshKey]);
-
-  if (!integrations && !error) {
+  if (!integrations && loading) {
     return (
       <Panel>
         <div className="flex items-center gap-3">
@@ -136,7 +108,7 @@ export default function SettingsPage() {
                     <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--muted)]">{providerContent[provider].syncs}</p>
                   </div>
                 </div>
-                <IntegrationActions provider={provider} integration={integration} onChange={() => setRefreshKey((value) => value + 1)} />
+                <IntegrationActions provider={provider} integration={integration} onChange={refresh} />
               </div>
             </Panel>
           );

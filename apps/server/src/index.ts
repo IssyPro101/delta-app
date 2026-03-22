@@ -5,6 +5,7 @@ import rawBody from "fastify-raw-body";
 
 import { authPlugin } from "./plugins/auth";
 import { authRoutes } from "./routes/auth";
+import { dashboardRoutes } from "./routes/dashboard";
 import { dealRoutes } from "./routes/deals";
 import { eventRoutes } from "./routes/events";
 import { insightsRoutes } from "./routes/insights";
@@ -34,6 +35,7 @@ async function main() {
   await app.register(authPlugin);
 
   await app.register(authRoutes);
+  await app.register(dashboardRoutes);
   await app.register(pipelineRoutes);
   await app.register(insightsRoutes);
   await app.register(eventRoutes);

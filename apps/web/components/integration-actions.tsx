@@ -1,9 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
-import type { Integration, IntegrationProvider, SyncStatusResponse } from "@pipeline-intelligence/shared";
+import {
+  SYNC_POLL_INTERVAL_MS,
+  type Integration,
+  type IntegrationProvider,
+  type SyncStatusResponse,
+} from "@pipeline-intelligence/shared";
 
 import { apiFetch } from "../lib/api";
 import { PrimaryButton, SecondaryButton } from "./ui";
@@ -17,7 +21,6 @@ export function IntegrationActions({
   integration?: Integration | undefined;
   onChange?: () => void;
 }>) {
-  const router = useRouter();
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponse["status"]>("idle");
   const [busy, setBusy] = useState(false);
 
@@ -48,9 +51,8 @@ export function IntegrationActions({
         window.clearInterval(interval);
         setBusy(false);
         onChange?.();
-        router.refresh();
       }
-    }, 3000);
+    }, SYNC_POLL_INTERVAL_MS);
   }
 
   async function disconnect() {
@@ -62,7 +64,6 @@ export function IntegrationActions({
     await apiFetch(`/api/integrations/${provider}`, { method: "DELETE" });
     setBusy(false);
     onChange?.();
-    router.refresh();
   }
 
   if (!isConnected) {

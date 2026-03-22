@@ -1,14 +1,15 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
-import type { PipelineResponse } from "@pipeline-intelligence/shared";
+import { pipelinePeriods, type PipelinePeriod } from "@pipeline-intelligence/shared";
 
+import { useDashboardData } from "../../../components/dashboard-data-provider";
 import { QuerySelect } from "../../../components/query-select";
 import { PipelineView } from "../../../components/pipeline-view";
 import { Panel } from "../../../components/ui";
-import { apiFetch, toErrorMessage } from "../../../lib/api";
+import { buildPipelineData } from "../../../lib/dashboard-data";
 
 const periodOptions = [
   { value: "last_30_days", label: "Last 30 days" },
@@ -28,41 +29,21 @@ export default function PipelinePage() {
 function PipelinePageContent() {
   const searchParams = useSearchParams();
   const pipelineName = searchParams.get("pipeline_name") ?? undefined;
-  const period = searchParams.get("period") ?? "last_90_days";
-  const [data, setData] = useState<PipelineResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const query = new URLSearchParams();
+  const requestedPeriod = searchParams.get("period");
+  const period =
+    requestedPeriod && pipelinePeriods.includes(requestedPeriod as PipelinePeriod)
+      ? (requestedPeriod as PipelinePeriod)
+      : "last_90_days";
+  const { data, error, loading } = useDashboardData();
+  const pipelineData = useMemo(() => {
+    if (!data) {
+      return null;
+    }
 
-  if (pipelineName) query.set("pipeline_name", pipelineName);
-  if (period) query.set("period", period);
-  const queryString = query.toString();
+    return buildPipelineData(data, pipelineName ? { pipelineName, period } : { period });
+  }, [data, period, pipelineName]);
 
-  useEffect(() => {
-    let active = true;
-
-    setData(null);
-    setError(null);
-
-    void (async () => {
-      try {
-        const nextData = await apiFetch<PipelineResponse>(`/api/pipeline?${queryString}`);
-
-        if (active) {
-          setData(nextData);
-        }
-      } catch (error) {
-        if (active) {
-          setError(toErrorMessage(error));
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [queryString]);
-
-  if (!data && !error) {
+  if (!data && loading) {
     return (
       <Panel>
         <div className="flex items-center gap-3">
@@ -73,7 +54,7 @@ function PipelinePageContent() {
     );
   }
 
-  if (!data) {
+  if (!data || !pipelineData) {
     return (
       <Panel className="border-[rgba(229,72,77,0.12)] bg-[color:var(--danger-soft)]">
         <p className="text-sm text-[color:var(--danger)]">{error ?? "Could not load pipeline data."}</p>
@@ -83,7 +64,7 @@ function PipelinePageContent() {
 
   const selectedPipeline = pipelineName ?? "all";
   const pipelineOptions = [{ value: "all", label: "All pipelines" }].concat(
-    data.pipelines.map((pipeline) => ({ value: pipeline, label: pipeline })),
+    pipelineData.pipelines.map((pipeline) => ({ value: pipeline, label: pipeline })),
   );
 
   return (
@@ -92,7 +73,7 @@ function PipelinePageContent() {
         <QuerySelect label="Pipeline" name="pipeline_name" value={selectedPipeline} options={pipelineOptions} />
         <QuerySelect label="Period" name="period" value={period} options={periodOptions} />
       </div>
-      <PipelineView data={data} />
+      <PipelineView data={pipelineData} />
     </div>
   );
 }

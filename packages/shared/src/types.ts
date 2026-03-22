@@ -180,6 +180,14 @@ export interface DealsResponse {
   total: number;
 }
 
+export interface DashboardDataResponse {
+  integrations: Integration[];
+  deals: Deal[];
+  stageTransitions: StageTransition[];
+  events: Event[];
+  insights: Insight[];
+}
+
 export interface SyncStatusResponse {
   status: SyncStatus;
   last_synced_at: string | null;
