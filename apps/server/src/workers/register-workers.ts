@@ -752,6 +752,7 @@ export function registerWorkers() {
           await runHubSpotBackfill(integration);
         } else {
           console.log("Running Fathom backfill");
+          console.log(integration);
           await runFathomBackfill(integration);
         }
 
