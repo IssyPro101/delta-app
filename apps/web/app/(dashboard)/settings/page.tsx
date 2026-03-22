@@ -25,13 +25,13 @@ const providerContent: Record<
 
 const providerIcons: Record<IntegrationProvider, React.ReactNode> = {
   hubspot: (
-    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[rgba(255,108,54,0.1)] text-base font-bold text-[#ff6c36]">
-      H
+    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[rgba(255,108,54,0.1)]">
+      <img src="/hubspot.png" alt="HubSpot" className="h-7 w-7" />
     </div>
   ),
   fathom: (
-    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[rgba(14,88,221,0.1)] font-[var(--font-display)] text-base text-[#1d74e7]">
-      F
+    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[rgba(14,88,221,0.1)]">
+      <img src="/fathom.png" alt="Fathom" className="h-7 w-7" />
     </div>
   ),
 };
@@ -114,11 +114,6 @@ export default function SettingsPage() {
           );
         })}
       </div>
-      <Panel>
-        <p className="text-sm leading-relaxed text-[color:var(--muted)]">
-          Data access is read-only. This app does not send emails or modify your CRM data.
-        </p>
-      </Panel>
     </div>
   );
 }

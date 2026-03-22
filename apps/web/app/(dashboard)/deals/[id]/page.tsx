@@ -7,10 +7,12 @@ import { useParams } from "next/navigation";
 import type { Deal, Event, Insight } from "@pipeline-intelligence/shared";
 
 import { useDashboardData } from "../../../../components/dashboard-data-provider";
-import { EmptyState, Panel, PrimaryButton, SecondaryButton } from "../../../../components/ui";
+import { EmptyState, Panel } from "../../../../components/ui";
 import { formatCurrency, formatDateTime, formatRelativeTime } from "../../../../lib/format";
 
 type TabId = "activity" | "insights";
+
+/* ─── Utilities ──────────────────────────────────────────── */
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -31,92 +33,125 @@ function relevantInsights(deal: Deal, insights: Insight[]) {
 }
 
 function stakeholderSummary(deal: Deal, events: Event[], insights: Insight[]) {
-  const corpus = [deal.name, deal.company_name, ...events.map((event) => `${event.title} ${event.summary}`), ...insights.map((insight) => `${insight.title} ${insight.description}`)]
+  const corpus = [deal.name, deal.company_name, ...events.map((e) => `${e.title} ${e.summary}`), ...insights.map((i) => `${i.title} ${i.description}`)]
     .join(" ")
     .toLowerCase();
-  const has = (keyword: string) => corpus.includes(keyword);
+  const has = (kw: string) => corpus.includes(kw);
 
   return [
-    { label: "Champion", status: events.some((event) => event.event_type === "contact_activity") ? "present" : "unknown", note: "Derived from existing contact activity" },
-    { label: "Economic Buyer", status: has("economic buyer") ? "present" : has("missing economic buyer") ? "missing" : "unknown", note: "Pulled from current insights and activity text" },
-    { label: "Procurement", status: has("procurement") ? "present" : has("missing procurement") ? "missing" : "unknown", note: "Pulled from current insights and activity text" },
-    { label: "Legal / Security", status: has("security") || has("legal") ? "present" : "unknown", note: "Pulled from current insights and activity text" },
-  ];
+    { label: "Champion", status: events.some((e) => e.event_type === "contact_activity") ? "present" : ("unknown" as const) },
+    { label: "Economic Buyer", status: has("economic buyer") ? "present" : has("missing economic buyer") ? "missing" : ("unknown" as const) },
+    { label: "Procurement", status: has("procurement") ? "present" : has("missing procurement") ? "missing" : ("unknown" as const) },
+    { label: "Legal / Security", status: has("security") || has("legal") ? "present" : ("unknown" as const) },
+  ] as const;
 }
 
 function scorecard(deal: Deal, events: Event[], insights: Insight[], stakeholderCount: number) {
   const inactivity = daysSince(deal.last_activity) ?? 14;
-  const recentEvents = events.filter((event) => Date.now() - new Date(event.occurred_at).getTime() <= 14 * 86_400_000).length;
-  const leaks = insights.filter((insight) => insight.category === "leak").length;
-  const risks = insights.filter((insight) => insight.category === "risk").length;
+  const recentEvents = events.filter((e) => Date.now() - new Date(e.occurred_at).getTime() <= 14 * 86_400_000).length;
+  const leaks = insights.filter((i) => i.category === "leak").length;
+  const risks = insights.filter((i) => i.category === "risk").length;
 
   const metrics = [
-    { label: "Follow-up Speed", value: clamp(100 - inactivity * 11), detail: `${inactivity} days since last meaningful activity` },
-    { label: "Stakeholder Coverage", value: clamp((stakeholderCount / 4) * 100), detail: `${stakeholderCount}/4 key roles present` },
-    { label: "Engagement Consistency", value: clamp(recentEvents * 16 + 20), detail: `${recentEvents} signals in the last 14 days` },
-    { label: "Stage Progression", value: clamp(82 - leaks * 14 - risks * 10), detail: `${leaks} leak signals, ${risks} risk signals` },
-    { label: "Objection Handling", value: clamp(events.some((event) => `${event.title} ${event.summary}`.toLowerCase().includes("implementation")) ? 44 : 76), detail: "Derived from the current activity feed" },
-    { label: "Next-step Clarity", value: clamp(insights.some((insight) => `${insight.title} ${insight.description}`.toLowerCase().includes("next step")) ? 36 : 80), detail: "Derived from the current insights set" },
+    { label: "Follow-up Speed", value: clamp(100 - inactivity * 11), detail: `${inactivity}d since last activity` },
+    { label: "Stakeholder Coverage", value: clamp((stakeholderCount / 4) * 100), detail: `${stakeholderCount}/4 roles identified` },
+    { label: "Engagement", value: clamp(recentEvents * 16 + 20), detail: `${recentEvents} signals in 14d` },
+    { label: "Stage Progression", value: clamp(82 - leaks * 14 - risks * 10), detail: `${leaks} leaks, ${risks} risks` },
+    { label: "Objection Handling", value: clamp(events.some((e) => `${e.title} ${e.summary}`.toLowerCase().includes("implementation")) ? 44 : 76), detail: "From activity feed" },
+    { label: "Next-step Clarity", value: clamp(insights.some((i) => `${i.title} ${i.description}`.toLowerCase().includes("next step")) ? 36 : 80), detail: "From insights" },
   ];
 
-  const overall = clamp(metrics.reduce((sum, metric) => sum + metric.value, 0) / metrics.length);
+  const overall = clamp(metrics.reduce((s, m) => s + m.value, 0) / metrics.length);
   return { metrics, overall, rep: clamp(overall - leaks * 4) };
 }
 
-function statusTone(value: number) {
+function scoreColor(value: number) {
+  if (value >= 75) return "var(--accent)";
+  if (value >= 45) return "var(--warn)";
+  return "var(--danger)";
+}
+
+function scoreTone(value: number) {
   if (value >= 75) return "bg-[color:var(--accent-soft)] text-[color:var(--accent)]";
   if (value >= 45) return "bg-[color:var(--warn-soft)] text-[color:var(--warn)]";
   return "bg-[color:var(--danger-soft)] text-[color:var(--danger)]";
 }
 
-function ActivityList({ events, insights, deal }: Readonly<{ events: Event[]; insights: Insight[]; deal: Deal }>) {
+/* ─── Sub-components ─────────────────────────────────────── */
+
+function ScoreBar({ label, value, detail }: Readonly<{ label: string; value: number; detail: string }>) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm text-[color:var(--text)]">{label}</span>
+        <span className="font-[var(--font-mono)] text-sm font-medium" style={{ color: scoreColor(value) }}>{value}</span>
+      </div>
+      <div className="h-1 rounded-full bg-[color:var(--panel-strong)]">
+        <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${value}%`, backgroundColor: scoreColor(value) }} />
+      </div>
+      <p className="text-xs text-[color:var(--muted)]">{detail}</p>
+    </div>
+  );
+}
+
+function ActivityTimeline({ events, insights, deal }: Readonly<{ events: Event[]; insights: Insight[]; deal: Deal }>) {
   const items = [
-    ...events.map((event) => ({
-      id: event.id,
-      title: event.title,
-      summary: event.summary,
-      timestamp: event.occurred_at,
-      source: event.source === "fathom" ? "Fathom" : "HubSpot",
+    ...events.map((e) => ({
+      id: e.id,
+      title: e.title,
+      summary: e.summary,
+      timestamp: e.occurred_at,
+      source: e.source === "fathom" ? "Fathom" : "HubSpot",
     })),
-    ...insights.slice(0, 3).map((insight) => ({
-      id: `insight-${insight.id}`,
-      title: insight.title,
-      summary: insight.description,
-      timestamp: insight.generated_at,
+    ...insights.slice(0, 3).map((i) => ({
+      id: `insight-${i.id}`,
+      title: i.title,
+      summary: i.description,
+      timestamp: i.generated_at,
       source: "Delta",
     })),
-  ].sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime());
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const inactivity = daysSince(deal.last_activity);
 
   return (
-    <div className="space-y-4">
-      {inactivity && inactivity >= 5 ? (
-        <Panel className={inactivity >= 8 ? "border-[rgba(229,72,77,0.16)] bg-[color:var(--danger-soft)]" : "border-[rgba(240,149,62,0.2)] bg-[color:var(--warn-soft)]"}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-[color:var(--text-strong)]">Momentum stalled for {inactivity} days</p>
-              <p className="text-sm leading-7 text-[color:var(--text)]">Delta detected an inactivity gap using the existing feed data for this deal.</p>
-            </div>
-            <span className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Delta</span>
+    <div className="space-y-3">
+      {inactivity != null && inactivity >= 5 ? (
+        <div className={`rounded-xl border px-4 py-3 ${inactivity >= 8 ? "border-[rgba(229,72,77,0.16)] bg-[color:var(--danger-soft)]" : "border-[rgba(240,149,62,0.2)] bg-[color:var(--warn-soft)]"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-[color:var(--text-strong)]">
+              <span className="font-semibold">Stalled {inactivity}d</span>
+              <span className="text-[color:var(--text)]"> — no meaningful activity detected</span>
+            </p>
+            <span className="shrink-0 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Delta</span>
           </div>
-        </Panel>
+        </div>
       ) : null}
-      {items.map((item) => (
-        <Panel key={item.id}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">{item.source}</p>
-              <h3 className="text-lg font-semibold text-[color:var(--text-strong)]">{item.title}</h3>
-              <p className="text-sm leading-7 text-[color:var(--text)]">{item.summary}</p>
+
+      {items.length === 0 ? (
+        <p className="py-8 text-center text-sm text-[color:var(--muted)]">No activity recorded yet.</p>
+      ) : (
+        items.map((item) => (
+          <div
+            key={item.id}
+            className="rounded-xl border border-[color:var(--line)] bg-[color:var(--panel)] p-4 transition-colors hover:border-[color:var(--line-strong)] hover:bg-[color:var(--panel-strong)]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 space-y-1.5">
+                <span className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.18em] text-[color:var(--muted)]">{item.source}</span>
+                <h3 className="text-sm font-semibold text-[color:var(--text-strong)]">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-[color:var(--text)]">{item.summary}</p>
+              </div>
+              <span className="shrink-0 pt-0.5 text-xs text-[color:var(--muted)]">{formatRelativeTime(item.timestamp)}</span>
             </div>
-            <span className="shrink-0 text-xs text-[color:var(--muted)]">{formatRelativeTime(item.timestamp)}</span>
           </div>
-        </Panel>
-      ))}
+        ))
+      )}
     </div>
   );
 }
+
+/* ─── Page ───────────────────────────────────────────────── */
 
 export default function DealPage() {
   return (
@@ -134,21 +169,22 @@ function DealPageContent() {
 
   const derived = useMemo(() => {
     if (!data || !dealId) return null;
-    const deal = data.deals.find((entry) => entry.id === dealId);
+    const deal = data.deals.find((d) => d.id === dealId);
     if (!deal) return null;
-    const events = data.events.filter((event) => event.deal_id === deal.id);
+    const events = data.events.filter((e) => e.deal_id === deal.id);
     const insights = relevantInsights(deal, data.insights);
     const stakeholders = stakeholderSummary(deal, events, insights);
-    const presentStakeholders = stakeholders.filter((stakeholder) => stakeholder.status === "present").length;
-    const scores = scorecard(deal, events, insights, presentStakeholders);
+    const presentCount = stakeholders.filter((s) => s.status === "present").length;
+    const scores = scorecard(deal, events, insights, presentCount);
     return { deal, events, insights, stakeholders, scores };
   }, [data, dealId]);
 
   if (!data && loading) {
     return (
-      <Panel>
-        <p className="text-sm text-[color:var(--muted)]">Loading deal workspace...</p>
-      </Panel>
+      <div className="flex items-center justify-center gap-3 py-20">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-[color:var(--line-strong)] border-t-[color:var(--accent)]" />
+        <p className="text-sm text-[color:var(--muted)]">Loading deal...</p>
+      </div>
     );
   }
 
@@ -156,199 +192,229 @@ function DealPageContent() {
     return (
       <EmptyState
         title="Deal not found"
-        description={error ?? "We could not find this deal in the existing dashboard data."}
+        description={error ?? "This deal could not be found in the current data."}
         action={<Link href="/pipeline" className="text-sm font-medium text-[color:var(--accent)] hover:underline">Back to pipeline</Link>}
       />
     );
   }
 
   const { deal, events, insights, stakeholders, scores } = derived;
-  const risks = insights.filter((insight) => insight.category === "risk" || insight.category === "leak").slice(0, 4);
-  const patterns = insights.filter((insight) => insight.category === "pattern").slice(0, 3);
-  const alert = insights[0]?.description ?? "Delta is monitoring this deal using the current feed and insight analyzers.";
+  const risks = insights.filter((i) => i.category === "risk" || i.category === "leak").slice(0, 4);
+  const patterns = insights.filter((i) => i.category === "pattern").slice(0, 3);
   const inactivity = daysSince(deal.last_activity);
+  const alertInsight = insights[0];
 
   return (
-    <div className="space-y-8">
-      <Panel className="overflow-hidden p-0">
-        <div className="border-b border-[color:var(--line)] bg-[radial-gradient(circle_at_top_left,rgba(14,88,221,0.18),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.02),transparent)] px-6 py-6 md:px-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.22em] text-[color:var(--muted)]">Deal workspace</p>
-                <h2 className="font-[var(--font-display)] text-3xl tracking-[-0.02em] text-[color:var(--text-strong)]">
-                  {deal.company_name} - {formatCurrency(deal.amount)}
-                </h2>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-[color:var(--muted)]">
-                <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${statusTone(scores.overall)}`}>Health {scores.overall}</span>
-                <span>Stage: {deal.stage}</span>
-                <span>Last activity: {inactivity === null ? "No signal" : `${inactivity} days ago`}</span>
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3 xl:min-w-[360px]">
-              <Panel className="p-4"><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Health</p><p className="mt-3 font-[var(--font-display)] text-3xl text-[color:var(--text-strong)]">{scores.overall}</p></Panel>
-              <Panel className="p-4"><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Rep score</p><p className="mt-3 font-[var(--font-display)] text-3xl text-[color:var(--text-strong)]">{scores.rep}</p></Panel>
-              <Panel className="p-4"><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Open risks</p><p className="mt-3 font-[var(--font-display)] text-3xl text-[color:var(--text-strong)]">{risks.length}</p></Panel>
+    <div className="space-y-6">
+
+      {/* ─── Header ─── */}
+      <div className="animate-[fadeIn_0.4s_ease-out_both]">
+        <Link href="/pipeline" className="inline-flex items-center gap-1.5 text-sm text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)]">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Pipeline
+        </Link>
+
+        <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <h1 className="font-[var(--font-display)] text-4xl tracking-[-0.02em] text-[color:var(--text-strong)]">
+              {deal.company_name}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+              <span className="font-medium text-[color:var(--text-strong)]">{formatCurrency(deal.amount)}</span>
+              <span className="text-[color:var(--line-strong)]">&middot;</span>
+              <span className="text-[color:var(--text)]">{deal.stage}</span>
+              <span className="text-[color:var(--line-strong)]">&middot;</span>
+              <span className="text-[color:var(--muted)]">{deal.owner_name ?? "Unassigned"}</span>
+              {inactivity !== null && (
+                <>
+                  <span className="text-[color:var(--line-strong)]">&middot;</span>
+                  <span className={inactivity >= 8 ? "text-[color:var(--danger)]" : inactivity >= 5 ? "text-[color:var(--warn)]" : "text-[color:var(--muted)]"}>
+                    {inactivity === 0 ? "Active today" : `${inactivity}d since last activity`}
+                  </span>
+                </>
+              )}
             </div>
           </div>
-        </div>
-        <div className="bg-[color:var(--danger-soft)] px-6 py-4 md:px-8">
-          <p className="text-sm leading-7 text-[color:var(--text)]"><span className="font-semibold text-[color:var(--text-strong)]">Delta alert:</span> {alert}</p>
-        </div>
-      </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-          <Panel>
-            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Deal snapshot</p>
-            <div className="mt-4 grid gap-4">
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Value</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{formatCurrency(deal.amount)}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Stage</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{deal.stage}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Close date</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{deal.close_date ? formatDateTime(deal.close_date) : "Not set"}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Owner</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{deal.owner_name ?? "Unassigned"}</p></div>
-            </div>
-          </Panel>
+          <div className={`flex shrink-0 flex-col items-center rounded-2xl px-5 py-3 ${scoreTone(scores.overall)}`}>
+            <span className="font-[var(--font-display)] text-4xl leading-none">{scores.overall}</span>
+            <span className="mt-1.5 font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em]">Health</span>
+          </div>
+        </div>
+      </div>
 
-          <Panel>
-            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Stakeholders</p>
-            <div className="mt-4 space-y-3">
-              {stakeholders.map((stakeholder) => (
-                <div key={stakeholder.label} className={`rounded-2xl border p-4 ${stakeholder.status === "present" ? "border-[rgba(14,88,221,0.18)] bg-[color:var(--accent-soft)]" : stakeholder.status === "missing" ? "border-[rgba(229,72,77,0.16)] bg-[color:var(--danger-soft)]" : "border-[color:var(--line)] bg-[color:var(--panel-strong)]"}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-[color:var(--text-strong)]">{stakeholder.label}</p>
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">{stakeholder.status}</span>
+      {/* ─── Metrics row ─── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 animate-[fadeIn_0.4s_ease-out_both]" style={{ animationDelay: "0.06s" }}>
+        <Panel className="p-4">
+          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Rep score</p>
+          <p className="mt-2 font-[var(--font-display)] text-2xl text-[color:var(--text-strong)]">{scores.rep}</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Open risks</p>
+          <p className="mt-2 font-[var(--font-display)] text-2xl text-[color:var(--text-strong)]">{risks.length}</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Events</p>
+          <p className="mt-2 font-[var(--font-display)] text-2xl text-[color:var(--text-strong)]">{events.length}</p>
+        </Panel>
+        <Panel className="p-4">
+          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Close date</p>
+          <p className="mt-2 text-sm font-medium text-[color:var(--text-strong)]">{deal.close_date ? formatDateTime(deal.close_date) : "Not set"}</p>
+        </Panel>
+      </div>
+
+      {/* ─── Alert ─── */}
+      {alertInsight && (
+        <div
+          className={`rounded-xl border px-5 py-3.5 animate-[fadeIn_0.4s_ease-out_both] ${
+            alertInsight.category === "risk" || alertInsight.category === "leak"
+              ? "border-[rgba(229,72,77,0.16)] bg-[color:var(--danger-soft)]"
+              : "border-[rgba(14,88,221,0.18)] bg-[color:var(--accent-soft)]"
+          }`}
+          style={{ animationDelay: "0.1s" }}
+        >
+          <p className="text-sm leading-relaxed text-[color:var(--text)]">
+            <span className="font-semibold text-[color:var(--text-strong)]">Delta: </span>
+            {alertInsight.description}
+          </p>
+        </div>
+      )}
+
+      {/* ─── Main content ─── */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px] animate-[fadeIn_0.4s_ease-out_both]" style={{ animationDelay: "0.14s" }}>
+
+        {/* ─── Left: tabs + content ─── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-1 rounded-xl border border-[color:var(--line)] bg-[color:var(--panel)] p-1">
+            {(["activity", "insights"] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium capitalize transition-colors ${
+                  tab === id
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)]"
+                    : "text-[color:var(--muted)] hover:text-[color:var(--text)]"
+                }`}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
+
+          {tab === "activity" ? (
+            <ActivityTimeline events={events} insights={insights} deal={deal} />
+          ) : (
+            <div className="space-y-4">
+              <Panel>
+                <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Scorecard</p>
+                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                  {scores.metrics.map((metric) => (
+                    <ScoreBar key={metric.label} {...metric} />
+                  ))}
+                </div>
+              </Panel>
+
+              {risks.length > 0 && (
+                <Panel>
+                  <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Risks & leaks</p>
+                  <div className="mt-4 space-y-3">
+                    {risks.map((insight) => (
+                      <div key={insight.id} className="rounded-xl border border-[color:var(--line)] p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="text-sm font-semibold text-[color:var(--text-strong)]">{insight.title}</h3>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] ${
+                            insight.category === "risk"
+                              ? "bg-[color:var(--danger-soft)] text-[color:var(--danger)]"
+                              : "bg-[color:var(--warn-soft)] text-[color:var(--warn)]"
+                          }`}>
+                            {insight.category}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-[color:var(--text)]">{insight.description}</p>
+                      </div>
+                    ))}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[color:var(--text)]">{stakeholder.note}</p>
+                </Panel>
+              )}
+
+              {patterns.length > 0 && (
+                <Panel>
+                  <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Patterns</p>
+                  <div className="mt-4 space-y-3">
+                    {patterns.map((pattern) => (
+                      <div key={pattern.id} className="rounded-xl border border-[color:var(--line)] p-4">
+                        <h3 className="text-sm font-semibold text-[color:var(--text-strong)]">{pattern.title}</h3>
+                        <p className="mt-1.5 text-sm leading-relaxed text-[color:var(--text)]">{pattern.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ─── Right: sidebar ─── */}
+        <div className="space-y-4">
+          <Panel>
+            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Deal details</p>
+            <div className="mt-4 space-y-0">
+              {[
+                { label: "Value", value: formatCurrency(deal.amount) },
+                { label: "Stage", value: deal.stage },
+                { label: "Close date", value: deal.close_date ? formatDateTime(deal.close_date) : "Not set" },
+                { label: "Owner", value: deal.owner_name ?? "Unassigned" },
+                { label: "Last signal", value: deal.last_activity ? formatDateTime(deal.last_activity) : "None" },
+              ].map((row, i, arr) => (
+                <div key={row.label} className={`flex items-baseline justify-between gap-3 py-2.5 ${i < arr.length - 1 ? "border-b border-[color:var(--line)]" : ""}`}>
+                  <span className="text-xs uppercase tracking-[0.15em] text-[color:var(--muted)]">{row.label}</span>
+                  <span className="text-right text-sm text-[color:var(--text-strong)]">{row.value}</span>
                 </div>
               ))}
             </div>
           </Panel>
 
           <Panel>
-            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Key deal info</p>
-            <div className="mt-4 grid gap-4">
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Current blocker</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{risks[0]?.title ?? "No active blocker flagged"}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Next step</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{insights.some((insight) => `${insight.title} ${insight.description}`.toLowerCase().includes("next step")) ? "Missing in current record" : "Delta sees a next-step signal"}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Implementation concern</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{events.find((event) => `${event.title} ${event.summary}`.toLowerCase().includes("implementation"))?.summary ?? "No implementation concern captured"}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Last synced signal</p><p className="mt-1 text-sm text-[color:var(--text-strong)]">{deal.last_activity ? formatDateTime(deal.last_activity) : "No synced activity yet"}</p></div>
+            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Stakeholders</p>
+            <div className="mt-4 space-y-2.5">
+              {stakeholders.map((s) => (
+                <div key={s.label} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`h-2 w-2 rounded-full ${
+                      s.status === "present" ? "bg-[color:var(--accent)]"
+                        : s.status === "missing" ? "bg-[color:var(--danger)]"
+                        : "bg-[color:var(--line-strong)]"
+                    }`} />
+                    <span className="text-sm text-[color:var(--text-strong)]">{s.label}</span>
+                  </div>
+                  <span className={`text-xs capitalize ${
+                    s.status === "present" ? "text-[color:var(--accent)]"
+                      : s.status === "missing" ? "text-[color:var(--danger)]"
+                      : "text-[color:var(--muted)]"
+                  }`}>
+                    {s.status}
+                  </span>
+                </div>
+              ))}
             </div>
           </Panel>
-        </div>
 
-        <div className="space-y-6">
           <Panel>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Main workspace</p>
-                <h3 className="mt-2 font-[var(--font-display)] text-2xl text-[color:var(--text-strong)]">Activity and coaching</h3>
+            <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Coaching</p>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl border border-[color:var(--line)] p-3">
+                <p className="text-sm font-medium text-[color:var(--text-strong)]">Reply within 24h</p>
+                <p className="mt-1 text-xs leading-relaxed text-[color:var(--muted)]">Address buyer concerns quickly to maintain momentum.</p>
               </div>
-              <div className="inline-flex rounded-full border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-1">
-                <button type="button" onClick={() => setTab("activity")} className={`rounded-full px-4 py-2 text-sm ${tab === "activity" ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)]" : "text-[color:var(--muted)]"}`}>Activity</button>
-                <button type="button" onClick={() => setTab("insights")} className={`rounded-full px-4 py-2 text-sm ${tab === "insights" ? "bg-[color:var(--accent-soft)] text-[color:var(--accent)]" : "text-[color:var(--muted)]"}`}>Insights</button>
-              </div>
-            </div>
-          </Panel>
-
-          {tab === "activity" ? (
-            <ActivityList events={events} insights={insights} deal={deal} />
-          ) : (
-            <div className="space-y-6">
-              <Panel>
-                <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Deal scorecard</p>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {scores.metrics.map((metric) => (
-                    <div key={metric.label} className={`rounded-2xl border p-4 ${statusTone(metric.value)}`}>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold">{metric.label}</p>
-                        <span className="font-[var(--font-display)] text-2xl">{metric.value}</span>
-                      </div>
-                      <p className="mt-2 text-sm leading-6 opacity-90">{metric.detail}</p>
-                    </div>
-                  ))}
-                </div>
-              </Panel>
-
-              <Panel>
-                <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Mistakes and missed actions</p>
-                <div className="mt-4 space-y-3">
-                  {risks.map((insight) => (
-                    <div key={insight.id} className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-base font-semibold text-[color:var(--text-strong)]">{insight.title}</h3>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] ${insight.category === "risk" ? "bg-[color:var(--danger-soft)] text-[color:var(--danger)]" : "bg-[color:var(--warn-soft)] text-[color:var(--warn)]"}`}>{insight.category}</span>
-                      </div>
-                      <p className="mt-2 text-sm leading-7 text-[color:var(--text)]">{insight.description}</p>
-                    </div>
-                  ))}
-                </div>
-              </Panel>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Panel>
-                  <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Historical patterns</p>
-                  <div className="mt-4 space-y-3">
-                    {patterns.length === 0 ? (
-                      <p className="text-sm text-[color:var(--muted)]">Patterns will appear here when the existing analyzers have enough history.</p>
-                    ) : (
-                      patterns.map((pattern) => (
-                        <div key={pattern.id} className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-4">
-                          <h3 className="text-base font-semibold text-[color:var(--text-strong)]">{pattern.title}</h3>
-                          <p className="mt-2 text-sm leading-7 text-[color:var(--text)]">{pattern.description}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </Panel>
-
-                <Panel>
-                  <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Suggested coaching actions</p>
-                  <div className="mt-4 space-y-3">
-                    <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-4"><p className="text-sm font-semibold text-[color:var(--text-strong)]">Reply within 24 hours to buyer concerns</p><p className="mt-2 text-sm leading-7 text-[color:var(--text)]">This recommendation is grounded in the current activity feed and the active insight set.</p></div>
-                    <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-4"><p className="text-sm font-semibold text-[color:var(--text-strong)]">Multi-thread the account earlier</p><p className="mt-2 text-sm leading-7 text-[color:var(--text)]">Use the stakeholder coverage panel to close gaps in economic buyer and procurement coverage.</p></div>
-                  </div>
-                </Panel>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <Panel className="sticky top-28">
-            <div className="space-y-6">
-              <div>
-                <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--muted)]">Delta</p>
-                <h3 className="mt-2 font-[var(--font-display)] text-2xl text-[color:var(--text-strong)]">Action assistant</h3>
-                <p className="mt-2 text-sm leading-7 text-[color:var(--muted)]">Assisting on {deal.company_name} in {deal.stage} using the current dashboard context.</p>
-              </div>
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--muted)]">Next best actions</p>
-                {[
-                  "Draft a buyer follow-up",
-                  "Add procurement stakeholder",
-                  "Update CRM from discovered signals",
-                  "Prepare meeting brief",
-                ].map((action) => (
-                  <div key={action} className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-4">
-                    <p className="text-sm font-semibold text-[color:var(--text-strong)]">{action}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid gap-3">
-                <PrimaryButton>Draft follow-up email</PrimaryButton>
-                <SecondaryButton>Generate implementation brief</SecondaryButton>
-                <SecondaryButton>Update CRM from signals</SecondaryButton>
-                <SecondaryButton>Add missing stakeholder</SecondaryButton>
-              </div>
-              <div className="rounded-2xl border border-[color:var(--line)] bg-[color:var(--panel-strong)] p-4">
-                <p className="text-sm font-semibold text-[color:var(--text-strong)]">Delta chat</p>
-                <p className="mt-3 text-sm leading-7 text-[color:var(--text)]">&quot;Draft a reply to the latest implementation concern&quot;</p>
-                <p className="mt-2 text-sm leading-7 text-[color:var(--text)]">&quot;Why is this deal at risk?&quot;</p>
-                <p className="mt-2 text-sm leading-7 text-[color:var(--text)]">&quot;What changed in the last 7 days?&quot;</p>
+              <div className="rounded-xl border border-[color:var(--line)] p-3">
+                <p className="text-sm font-medium text-[color:var(--text-strong)]">Multi-thread earlier</p>
+                <p className="mt-1 text-xs leading-relaxed text-[color:var(--muted)]">Engage additional stakeholders to reduce single-thread risk.</p>
               </div>
             </div>
           </Panel>
         </div>
+
       </div>
     </div>
   );

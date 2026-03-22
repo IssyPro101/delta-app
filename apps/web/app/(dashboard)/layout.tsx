@@ -10,6 +10,7 @@ import { useAuth } from "../../components/auth-provider";
 import { DashboardDataProvider } from "../../components/dashboard-data-provider";
 
 function inferTitle(pathname: string) {
+  if (pathname === "/deals") return "Deals";
   if (pathname.startsWith("/deals/")) return "Deal View";
   if (pathname.startsWith("/insights")) return "Insights";
   if (pathname.startsWith("/feed")) return "Feed";
@@ -47,9 +48,7 @@ function DashboardLayoutContent({ children }: Readonly<{ children: React.ReactNo
     return (
       <main className="grid min-h-screen place-items-center p-6">
         <div className="w-full max-w-md space-y-5 text-center">
-          <div className="mx-auto grid h-10 w-10 animate-pulse place-items-center rounded-xl bg-gradient-to-br from-[#0e58dd] to-[#1d74e7] font-[var(--font-display)] text-sm text-white">
-            Δ
-          </div>
+          <img src="/delta-logo.png" alt="Delta" className="mx-auto h-10 animate-pulse" />
           <h1 className="font-[var(--font-display)] text-3xl text-[color:var(--text-strong)]">
             Checking your session
           </h1>

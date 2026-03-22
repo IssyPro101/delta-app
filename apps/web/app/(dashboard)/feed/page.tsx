@@ -8,9 +8,9 @@ import { FeedList } from "../../../components/feed-view";
 import { EmptyState, Panel, PillLink, SectionTitle } from "../../../components/ui";
 
 const sourceTabs = [
-  { label: "All", value: "" },
-  { label: "Fathom", value: "fathom" },
-  { label: "HubSpot", value: "hubspot" },
+  { label: "All", value: "", icon: null },
+  { label: "Fathom", value: "fathom", icon: <img src="/fathom.png" alt="" className="h-4 w-4" /> },
+  { label: "HubSpot", value: "hubspot", icon: <img src="/hubspot.png" alt="" className="h-4 w-4" /> },
 ];
 
 export default function FeedPage() {
@@ -117,7 +117,7 @@ function FeedPageContent() {
     <div className="space-y-8">
       <div className="flex flex-wrap gap-3">
         {sourceTabs.map((tab) => {
-          return <PillLink key={tab.label} href={sourceHref(tab.value)} label={tab.label} active={source === tab.value || (!source && !tab.value)} />;
+          return <PillLink key={tab.label} href={sourceHref(tab.value)} label={tab.label} icon={tab.icon} active={source === tab.value || (!source && !tab.value)} />;
         })}
       </div>
       <SectionTitle eyebrow="Inspection Layer" title="Raw chronological activity across every deal" />

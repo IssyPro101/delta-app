@@ -17,6 +17,7 @@ export const periodToDays: Record<Exclude<PipelinePeriod, "all_time">, number> =
 
 export const sidebarNavigation = [
   { href: "/pipeline", label: "Pipeline" },
+  { href: "/deals", label: "Deals" },
   { href: "/insights", label: "Insights" },
   { href: "/feed", label: "Feed" },
   { href: "/settings", label: "Settings" },

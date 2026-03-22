@@ -1,9 +1,13 @@
+"use client";
+
 import clsx from "clsx";
 import Link from "next/link";
 
 import { sidebarNavigation } from "@pipeline-intelligence/shared";
 
 import type { AuthSession } from "@pipeline-intelligence/shared";
+
+import { useAgentChat } from "./agent-chat-provider";
 
 function getInitials(name: string) {
   return name
@@ -20,6 +24,12 @@ const navIcons: Record<string, React.ReactNode> = {
       <rect x="6" y="7" width="3" height="9.5" rx="0.75" opacity="0.55" />
       <rect x="10.5" y="4" width="3" height="12.5" rx="0.75" opacity="0.75" />
       <rect x="15" y="1.5" width="1.5" height="15" rx="0.75" />
+    </svg>
+  ),
+  Deals: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="3" width="13" height="12" rx="2" />
+      <path d="M6 7h6M6 10h4" />
     </svg>
   ),
   Insights: (
@@ -60,19 +70,14 @@ export function AppShell({
   signingOut?: boolean;
   children: React.ReactNode;
 }>) {
+  const { open: agentOpen, toggleOpen: toggleAgent } = useAgentChat();
+
   return (
     <div className="min-h-screen">
       {/* ── Mobile header ── */}
       <div className="border-b border-[color:var(--line)] bg-[var(--sidebar)] md:hidden">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-[#0e58dd] to-[#1d74e7] font-[var(--font-display)] text-xs text-white">
-              Δ
-            </div>
-            <span className="font-[var(--font-display)] text-[15px] text-[color:var(--text-strong)]">
-              Delta
-            </span>
-          </div>
+          <img src="/delta-logo.png" alt="Delta" className="h-8" />
           <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-[#012fbd] to-[#0e58dd] text-[10px] font-semibold text-white">
             {getInitials(session.user.name)}
           </div>
@@ -102,14 +107,7 @@ export function AppShell({
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-[72px] flex-col border-r border-[color:var(--line)] bg-[var(--sidebar)] md:flex xl:w-[260px]">
         {/* Logo */}
         <div className="flex items-center gap-3.5 px-4 py-6 xl:px-6">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#0e58dd] to-[#1d74e7] font-[var(--font-display)] text-base text-white shadow-[0_2px_12px_rgba(14,88,221,0.3)]">
-            Δ
-          </div>
-          <div className="hidden xl:block">
-            <p className="font-[var(--font-display)] text-[17px] text-[color:var(--text-strong)]">
-              Delta
-            </p>
-          </div>
+          <img src="/delta-logo.png" alt="Delta" className="h-10 shrink-0" />
         </div>
 
         {/* Navigation */}
@@ -165,14 +163,33 @@ export function AppShell({
       </aside>
 
       {/* ── Main content ── */}
-      <main className="md:ml-[72px] xl:ml-[260px]">
+      <main
+        className={clsx(
+          "transition-[margin] duration-250 ease-[cubic-bezier(0.25,0.1,0.25,1)] md:ml-[72px] xl:ml-[260px]",
+          agentOpen && "md:mr-[380px]",
+        )}
+      >
         <header className="sticky top-0 z-10 border-b border-[color:var(--line)] bg-[var(--bg)]/80 px-6 py-6 backdrop-blur-xl md:px-10">
-          <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-[color:var(--muted)]">
-            Pipeline Intelligence
-          </p>
-          <h1 className="mt-1.5 font-[var(--font-display)] text-[28px] tracking-[-0.01em] text-[color:var(--text-strong)]">
-            {title}
-          </h1>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-[var(--font-mono)] text-[10px] uppercase tracking-[0.25em] text-[color:var(--muted)]">
+                Pipeline Intelligence
+              </p>
+              <h1 className="mt-1.5 font-[var(--font-display)] text-[28px] tracking-[-0.01em] text-[color:var(--text-strong)]">
+                {title}
+              </h1>
+            </div>
+            {!agentOpen ? (
+              <button
+                onClick={toggleAgent}
+                title="Open Delta (⌘.)"
+                className="flex shrink-0 items-center gap-2 rounded-xl bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[0_2px_12px_rgba(14,88,221,0.3)] transition-all duration-200 hover:scale-105 hover:shadow-[0_4px_20px_rgba(14,88,221,0.4)]"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.8 3.6L14 6.4l-3 2.9.7 4.1L8 11.4 4.3 13.4l.7-4.1-3-2.9 4.2-.8L8 1z"/></svg>
+                Chat with Delta
+              </button>
+            ) : null}
+          </div>
         </header>
         <div className="space-y-8 px-6 py-8 md:px-10 md:py-10">{children}</div>
       </main>

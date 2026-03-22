@@ -47,21 +47,24 @@ export function PillLink({
   href,
   label,
   active = false,
+  icon,
 }: Readonly<{
   href: string;
   label: string;
   active?: boolean;
+  icon?: React.ReactNode;
 }>) {
   return (
     <Link
       href={href}
       className={clsx(
-        "rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200",
+        "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200",
         active
           ? "border-[color:var(--accent)] bg-[color:var(--accent-soft)] text-[color:var(--accent)]"
           : "border-[color:var(--line)] text-[color:var(--muted)] hover:border-[color:var(--line-strong)] hover:text-[color:var(--text)]",
       )}
     >
+      {icon}
       {label}
     </Link>
   );

@@ -39,13 +39,11 @@ function SignInPageContent() {
       </div>
 
       <div className="relative w-full max-w-lg space-y-8 text-center">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#0e58dd] to-[#1d74e7] font-[var(--font-display)] text-xl text-white shadow-[0_2px_20px_rgba(14,88,221,0.3)]">
-          Δ
-        </div>
+        <img src="/delta-logo.png" alt="Delta" className="mx-auto h-14" />
 
         <div className="space-y-4">
           <h1 className="font-[var(--font-display)] text-4xl tracking-[-0.01em] text-[color:var(--text-strong)] md:text-[44px] md:leading-[1.15]">
-            Spot pipeline leaks and close more deals.
+            Never make the same sale mistake again.
           </h1>
           <p className="mx-auto max-w-sm text-sm leading-relaxed text-[color:var(--muted)]">
             Sign in with Google to connect HubSpot and Fathom, backfill historical activity, and generate pipeline findings.
