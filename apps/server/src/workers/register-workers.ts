@@ -636,8 +636,13 @@ async function processHubSpotWebhookEvent(payload: Record<string, unknown>, inte
     const auth = hubspotAuthFor(integration);
     const contact = await fetchHubSpotContact(auth, objectId);
     const deal = await getDealForHubSpotContact(userId, auth, objectId);
+    const importedCount =
+      deal === null
+        ? 0
+        : await syncHubSpotDealActivities(userId, auth, deal, await fetchHubSpotDeal(auth, deal.external_id));
 
-    await createEvent(userId, "hubspot", deal, {
+    if (importedCount === 0) {
+      await createEvent(userId, "hubspot", deal, {
       eventType: "contact_activity",
       title: `Contact Activity — ${contact.properties.firstname ?? contact.properties.email ?? "Contact"}`,
       summary: `${propertyName || "Contact"} activity was captured in HubSpot.`,
@@ -648,7 +653,8 @@ async function processHubSpotWebhookEvent(payload: Record<string, unknown>, inte
         contact_name: [contact.properties.firstname, contact.properties.lastname].filter(Boolean).join(" ") || null,
       },
       rawPayload: payload,
-    });
+      });
+    }
 
     await touchIntegrationSync(userId, "hubspot");
 
@@ -753,6 +759,7 @@ async function processHubSpotWebhookEvent(payload: Record<string, unknown>, inte
     await runPipelineAnalyzers(userId, deal.pipeline_name);
   }
 
+  await syncHubSpotDealActivities(userId, auth, deal, rawDeal);
   await touchIntegrationSync(userId, "hubspot");
 }
 
@@ -770,6 +777,7 @@ async function runHubSpotBackfill(integration: IntegrationRecord) {
       const deal = await upsertDealSnapshot(integration.user_id, rawDeal);
       pipelines.add(deal.pipeline_name);
       await createHubSpotHistoricalEvents(integration.user_id, deal, rawDeal);
+      await syncHubSpotDealActivities(integration.user_id, auth, deal, rawDeal);
     }
 
     after = page.paging?.next?.after;

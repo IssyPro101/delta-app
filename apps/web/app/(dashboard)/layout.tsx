@@ -10,6 +10,7 @@ import { useAuth } from "../../components/auth-provider";
 import { DashboardDataProvider } from "../../components/dashboard-data-provider";
 
 function inferTitle(pathname: string) {
+  if (pathname.startsWith("/deals/")) return "Deal View";
   if (pathname.startsWith("/insights")) return "Insights";
   if (pathname.startsWith("/feed")) return "Feed";
   if (pathname.startsWith("/settings")) return "Settings";

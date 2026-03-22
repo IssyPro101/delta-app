@@ -79,6 +79,16 @@ export interface ContactActivityMetadata {
   activity_type: string;
   contact_email: string | null;
   contact_name: string | null;
+  body_preview?: string | null;
+  subject?: string | null;
+  status?: string | null;
+  direction?: string | null;
+  priority?: string | null;
+  task_type?: string | null;
+  hubspot_activity_id?: string | null;
+  hubspot_activity_object_id?: string | null;
+  hubspot_activity_object_type?: string | null;
+  related_contact_ids?: string[];
 }
 
 export interface DealCreatedMetadata {
