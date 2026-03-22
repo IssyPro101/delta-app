@@ -185,7 +185,6 @@ export function AppShell({
                 title="Open Delta (⌘.)"
                 className="flex shrink-0 items-center gap-2 rounded-xl bg-[color:var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-[0_2px_12px_rgba(14,88,221,0.3)] transition-all duration-200 hover:scale-105 hover:shadow-[0_4px_20px_rgba(14,88,221,0.4)]"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l1.8 3.6L14 6.4l-3 2.9.7 4.1L8 11.4 4.3 13.4l.7-4.1-3-2.9 4.2-.8L8 1z"/></svg>
                 Chat with Delta
               </button>
             ) : null}

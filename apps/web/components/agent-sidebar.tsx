@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 import type { AgentConversationDetailResponse, AgentConversationSummary } from "@pipeline-intelligence/shared";
 
@@ -720,6 +721,25 @@ function ToolInvocationCard({
 
 /* ── Message bubble ── */
 
+/** Split assistant parts into groups separated by step-start markers so each
+ *  agent "step" renders as its own chat bubble. */
+function splitPartsIntoGroups(parts: UIMessage["parts"]): UIMessage["parts"][] {
+  const groups: UIMessage["parts"][] = [];
+  let current: UIMessage["parts"] = [];
+
+  for (const part of parts) {
+    if (part.type === "step-start") {
+      // Flush the current group if it has visible content
+      if (current.length > 0) groups.push(current);
+      current = [];
+      continue;
+    }
+    current.push(part);
+  }
+  if (current.length > 0) groups.push(current);
+  return groups;
+}
+
 function MessageBubble({ message }: Readonly<{ message: UIMessage }>) {
   const isUser = message.role === "user";
 
@@ -729,42 +749,64 @@ function MessageBubble({ message }: Readonly<{ message: UIMessage }>) {
   );
   if (!hasVisibleContent) return null;
 
-  return (
-    <div className={clsx("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={clsx(
-          "max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2.5",
-          isUser
-            ? "bg-[color:var(--accent)] text-white"
-            : "bg-[rgba(255,255,255,0.04)] text-[color:var(--text)]",
-        )}
-      >
-        {message.parts.map((part, index) => {
-          if (part.type === "text") {
-            return (
-              <p
-                key={`${message.id}-${index}`}
-                className="whitespace-pre-wrap text-[13px] leading-[22px]"
-              >
-                {part.text}
-              </p>
-            );
-          }
-
-          // Skip step-start parts — they're metadata markers, not content.
-          // A live typing indicator is shown separately based on stream status.
-          if (part.type === "step-start") {
+  // User messages always render as a single bubble
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2.5 bg-[color:var(--accent)] text-white">
+          {message.parts.map((part, index) => {
+            if (part.type === "text") {
+              return (
+                <p key={`${message.id}-${index}`} className="whitespace-pre-wrap text-[13px] leading-[22px]">
+                  {part.text}
+                </p>
+              );
+            }
             return null;
-          }
-
-          if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
-            return <ToolInvocationCard key={`${message.id}-${index}`} part={part as Record<string, unknown> & { type: string }} />;
-          }
-
-          return null;
-        })}
+          })}
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  // Assistant messages: split into separate bubbles per step
+  const groups = splitPartsIntoGroups(message.parts);
+
+  return (
+    <>
+      {groups.map((group, groupIndex) => {
+        // Skip groups with no visible content
+        const groupHasContent = group.some(
+          (part) => (part.type === "text" && part.text.trim()) || part.type.startsWith("tool-") || part.type === "dynamic-tool",
+        );
+        if (!groupHasContent) return null;
+
+        return (
+          <div key={`${message.id}-g${groupIndex}`} className="flex justify-start">
+            <div className="max-w-[85%] space-y-2 rounded-2xl px-3.5 py-2.5 bg-[rgba(255,255,255,0.04)] text-[color:var(--text)]">
+              {group.map((part, index) => {
+                if (part.type === "text") {
+                  return (
+                    <div
+                      key={`${message.id}-g${groupIndex}-${index}`}
+                      className="prose-agent text-[13px] leading-[22px]"
+                    >
+                      <ReactMarkdown>{part.text}</ReactMarkdown>
+                    </div>
+                  );
+                }
+
+                if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
+                  return <ToolInvocationCard key={`${message.id}-g${groupIndex}-${index}`} part={part as Record<string, unknown> & { type: string }} />;
+                }
+
+                return null;
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -918,7 +960,7 @@ function AgentConversationThread({
 
       {/* Status line */}
       {(error || disabled) ? (
-        <div className="px-4">
+        <div className="px-4 mb-2">
           <p className={clsx(
             "text-[11px]",
             error ? "text-[color:var(--danger)]" : "text-[color:var(--muted)]",
@@ -929,8 +971,8 @@ function AgentConversationThread({
       ) : null}
 
       {/* Input area */}
-      <div className="border-t border-[color:var(--line)] px-3 py-3">
-        <div className="flex items-end gap-2 rounded-xl border border-[color:var(--line)] bg-[rgba(255,255,255,0.03)] px-3 py-2 transition-colors focus-within:border-[color:var(--accent)]">
+      <div className="px-3 pb-3 pt-2">
+        <div className="flex items-end gap-2.5 rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2.5 shadow-[0_-1px_12px_rgba(0,0,0,0.08)] backdrop-blur-sm transition-all duration-200 focus-within:border-[color:var(--accent)] focus-within:shadow-[0_0_0_1px_var(--accent),0_-1px_16px_rgba(0,0,0,0.12)]">
           <textarea
             ref={textareaRef}
             value={input}
@@ -944,16 +986,16 @@ function AgentConversationThread({
             placeholder="Ask Delta..."
             disabled={disabled}
             rows={1}
-            className="max-h-[120px] min-h-[24px] flex-1 resize-none bg-transparent text-[13px] leading-6 text-[color:var(--text-strong)] outline-none placeholder:text-[color:var(--muted)] disabled:opacity-50"
+            className="max-h-[120px] min-h-[28px] flex-1 resize-none bg-transparent text-[13px] leading-7 text-[color:var(--text-strong)] outline-none placeholder:text-[color:var(--muted)] disabled:opacity-40"
           />
           <button
             onClick={handleSubmit}
             disabled={disabled || !input.trim()}
             className={clsx(
-              "grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-all",
+              "grid h-8 w-8 shrink-0 place-items-center rounded-xl transition-all duration-200",
               input.trim() && !disabled
-                ? "bg-[color:var(--accent)] text-white hover:brightness-110"
-                : "text-[color:var(--muted)] opacity-40",
+                ? "bg-[color:var(--accent)] text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] hover:brightness-110 hover:shadow-[0_2px_12px_rgba(0,0,0,0.3)] active:scale-95"
+                : "text-[color:var(--muted)] opacity-30",
             )}
           >
             {disabled ? <SpinnerIcon /> : <SendIcon />}
