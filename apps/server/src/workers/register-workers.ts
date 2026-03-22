@@ -128,7 +128,8 @@ function getAssociatedIds(
   associations: HubSpotDealResponse["associations"] | HubSpotActivityResponse["associations"] | undefined,
   associationType: string,
 ) {
-  return associations?.[associationType]?.results.map((result) => result.id) ?? [];
+  const lookup = associations as Record<string, { results: Array<{ id: string }> } | undefined> | undefined;
+  return lookup?.[associationType]?.results.map((result) => result.id) ?? [];
 }
 
 function normalizeEmails(emails: string[]) {

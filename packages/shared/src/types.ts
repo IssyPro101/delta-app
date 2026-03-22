@@ -206,3 +206,45 @@ export interface PipelineQuery {
   pipeline_name?: string;
   period?: PipelinePeriod;
 }
+
+export interface AgentToolActionResult {
+  action: string;
+  target: string;
+  status: "completed" | "blocked";
+  summary: string;
+  reference_id?: string;
+}
+
+export interface AgentMessage {
+  id: string;
+  role: "system" | "user" | "assistant";
+  parts: Array<Record<string, unknown>>;
+  created_at: string;
+}
+
+export interface AgentConversation {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentConversationSummary extends AgentConversation {
+  message_count: number;
+  last_message_at: string | null;
+}
+
+export interface AgentConversationListResponse {
+  conversations: AgentConversationSummary[];
+}
+
+export interface AgentConversationDetailResponse {
+  conversation: AgentConversation;
+  messages: AgentMessage[];
+}
+
+export interface AgentChatRequest {
+  conversation_id?: string | null;
+  messages: AgentMessage[];
+}

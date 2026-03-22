@@ -243,6 +243,71 @@ export interface Database {
           },
         ];
       };
+      agent_conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agent_conversations"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          user_id: string;
+          message_id: string;
+          position: number;
+          role: "system" | "user" | "assistant";
+          parts: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          user_id: string;
+          message_id: string;
+          position: number;
+          role: "system" | "user" | "assistant";
+          parts: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agent_messages"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_messages_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

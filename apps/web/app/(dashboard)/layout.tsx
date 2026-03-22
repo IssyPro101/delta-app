@@ -4,6 +4,8 @@ import { Suspense, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AppShell } from "../../components/app-shell";
+import { AgentChatProvider } from "../../components/agent-chat-provider";
+import { AgentSidebar } from "../../components/agent-sidebar";
 import { useAuth } from "../../components/auth-provider";
 import { DashboardDataProvider } from "../../components/dashboard-data-provider";
 
@@ -59,14 +61,17 @@ function DashboardLayoutContent({ children }: Readonly<{ children: React.ReactNo
   }
 
   return (
-    <AppShell
-      title={inferTitle(pathname)}
-      pathname={pathname}
-      session={session}
-      onSignOut={signOut}
-      signingOut={signingOut}
-    >
-      <DashboardDataProvider>{children}</DashboardDataProvider>
-    </AppShell>
+    <AgentChatProvider>
+      <AppShell
+        title={inferTitle(pathname)}
+        pathname={pathname}
+        session={session}
+        onSignOut={signOut}
+        signingOut={signingOut}
+      >
+        <DashboardDataProvider>{children}</DashboardDataProvider>
+      </AppShell>
+      <AgentSidebar />
+    </AgentChatProvider>
   );
 }
