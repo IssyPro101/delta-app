@@ -52,6 +52,8 @@ function toAvatarUrl(user: { user_metadata?: Record<string, unknown> }) {
 async function resolveAppUser(accessToken: string) {
   const { data, error } = await supabase.auth.getUser(accessToken);
 
+  console.log(data)
+
   if (error || !data.user || !data.user.email) {
     throw error ?? new Error("Authenticated user is missing an email");
   }
